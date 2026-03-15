@@ -14,13 +14,17 @@ export interface User {
 interface AuthContextType {
   user: User | null
   login: (email: string, password: string) => Promise<boolean>
-  signup: (name: string, email: string, password: string, role: UserRole) => Promise<boolean>
+  signup: (name: string, email: string, password: string, role: UserRole) => Promise<{ success: boolean; message?: string }>
   logout: () => void
   isAuthenticated: boolean
   hasPermission: (requiredRoles: UserRole[]) => boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+// Admin auth always goes to the LOCAL fmsadmin backend (not the Gyors GCP backend)
+// The local backend has prefix /v1 and runs on port 3000
+const LOCAL_ADMIN_API = 'http://localhost:3000/v1'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -31,34 +35,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedToken = localStorage.getItem('fms_admin_token')
     if (storedUser && storedToken) {
       setUser(JSON.parse(storedUser))
-      // Set token in API client
       apiClient.setToken(storedToken)
     }
   }, [])
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      // Call real API endpoint
-      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000/v1'
-      const response = await fetch(`${baseURL}/auth/login`, {
+      const response = await fetch(`${LOCAL_ADMIN_API}/auth/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
 
       const responseData = await response.json()
 
-      if (!response.ok || !responseData.success) {
-        console.error('Login failed:', responseData.error?.message || 'Unknown error')
+      if (!response.ok) {
+        console.error('Login failed:', responseData.message || responseData.error?.message || 'Unknown error')
         return false
       }
 
-      // Backend wraps the response in a 'data' property
+      // Local backend wraps in { success, data: { user, token } } via TransformInterceptor
       const data = responseData.data || responseData
+      const token = data.token || data.access_token || data.accessToken
 
-      // Map backend role format to frontend format
+      if (!token) {
+        console.error('No token in login response', responseData)
+        return false
+      }
+
       const roleMap: Record<string, UserRole> = {
         'SUPER_ADMIN': 'Super Admin',
         'OPERATIONS_ADMIN': 'Operations Admin',
@@ -67,21 +71,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         'COMPLIANCE_OFFICER': 'Compliance Officer',
       }
 
+      const rawUser = data.user || data
       const mappedUser: User = {
-        id: data.user.id,
-        name: data.user.name,
-        email: data.user.email,
-        role: roleMap[data.user.role] || data.user.role,
-        avatar: data.user.avatar,
+        id: rawUser.id || '',
+        name: rawUser.name || rawUser.email || email,
+        email: rawUser.email || email,
+        role: roleMap[rawUser.role] || 'Super Admin',
+        avatar: rawUser.avatar,
       }
 
       setUser(mappedUser)
       localStorage.setItem('fms_admin_user', JSON.stringify(mappedUser))
-      localStorage.setItem('fms_admin_token', data.token)
-      
-      // Set token in API client
-      apiClient.setToken(data.token)
-      
+      localStorage.setItem('fms_admin_token', token)
+      apiClient.setToken(token)
+
       return true
     } catch (error) {
       console.error('Login error:', error)
@@ -89,9 +92,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const signup = async (name: string, email: string, password: string, role: UserRole): Promise<boolean> => {
+  const signup = async (
+    name: string,
+    email: string,
+    password: string,
+    role: UserRole
+  ): Promise<{ success: boolean; message?: string }> => {
     try {
-      // Map frontend role format to backend format
       const roleMap: Record<UserRole, string> = {
         'Super Admin': 'SUPER_ADMIN',
         'Operations Admin': 'OPERATIONS_ADMIN',
@@ -100,33 +107,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         'Compliance Officer': 'COMPLIANCE_OFFICER',
       }
 
-      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000/v1'
-      const response = await fetch(`${baseURL}/auth/signup`, {
+      const response = await fetch(`${LOCAL_ADMIN_API}/auth/signup`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
           email,
           password,
           role: roleMap[role],
-          phone: '', // Optional field
         }),
       })
 
       const responseData = await response.json()
 
-      if (!response.ok || !responseData.success) {
-        console.error('Signup failed:', responseData.error?.message || 'Unknown error')
-        return false
+      if (!response.ok) {
+        const msg =
+          responseData.message ||
+          (Array.isArray(responseData.message) ? responseData.message.join(', ') : null) ||
+          responseData.error?.message ||
+          'Signup failed'
+        console.error('Signup failed:', msg)
+        return { success: false, message: msg }
       }
 
-      // Don't automatically log in - user should go to login page
-      return true
+      return { success: true }
     } catch (error) {
       console.error('Signup error:', error)
-      return false
+      return { success: false, message: 'Network error — is the local backend running?' }
     }
   }
 
@@ -134,8 +141,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     localStorage.removeItem('fms_admin_user')
     localStorage.removeItem('fms_admin_token')
-    
-    // Clear token in API client
     apiClient.clearToken()
   }
 
@@ -152,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signup,
         logout,
         isAuthenticated: !!user,
-        hasPermission
+        hasPermission,
       }}
     >
       {children}

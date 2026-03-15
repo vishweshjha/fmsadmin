@@ -34,11 +34,11 @@ export default function Signup() {
     setLoading(true)
 
     try {
-      const success = await signup(name, email, password, role)
-      if (success) {
+      const result = await signup(name, email, password, role)
+      if (result.success) {
         navigate('/login')
       } else {
-        setError('Signup failed. Please try again.')
+        setError(result.message || 'Signup failed. Please try again.')
       }
     } catch (err) {
       setError('An error occurred. Please try again.')

@@ -1,23 +1,18 @@
 /**
  * API Client Service
- * Handles all API requests with authentication and error handling
+ * Handles all API requests to the Gyors backend with authentication and error handling
  */
-
-import API_ENDPOINTS from '../../mock/api-endpoints'
-import { ApiResponse, ApiError } from '../../mock/api-schemas/common.schema'
 
 class ApiClient {
   private baseURL: string
   private token: string | null = null
 
   constructor() {
-    // Vite uses import.meta.env instead of process.env
-    this.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000/v1'
+    this.baseURL = import.meta.env.VITE_API_URL || 'https://gyors-backend-311476989793.us-central1.run.app/api'
     this.loadToken()
   }
 
   private loadToken() {
-    // Load token from localStorage
     this.token = localStorage.getItem('fms_admin_token')
   }
 
@@ -29,6 +24,10 @@ class ApiClient {
   clearToken() {
     this.token = null
     localStorage.removeItem('fms_admin_token')
+  }
+
+  getBaseURL(): string {
+    return this.baseURL
   }
 
   private getHeaders(): HeadersInit {
@@ -43,17 +42,16 @@ class ApiClient {
     return headers
   }
 
-  private async handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
-    const data = await response.json()
+  private async handleResponse<T>(response: Response): Promise<{ success: boolean; data?: T; error?: any; pagination?: any; message?: string }> {
+    let data: any
+    const contentType = response.headers.get('content-type')
+    if (contentType && contentType.includes('application/json')) {
+      data = await response.json()
+    } else {
+      data = {}
+    }
 
     if (!response.ok) {
-      const error: ApiError = {
-        code: data.error?.code || 'UNKNOWN_ERROR',
-        message: data.error?.message || 'An error occurred',
-        details: data.error?.details,
-        timestamp: new Date().toISOString(),
-      }
-
       // Handle 401 Unauthorized - redirect to login
       if (response.status === 401) {
         this.clearToken()
@@ -62,19 +60,24 @@ class ApiClient {
 
       return {
         success: false,
-        error,
+        error: {
+          code: data.error?.code || data.statusCode || 'API_ERROR',
+          message: data.message || data.error?.message || `Request failed with status ${response.status}`,
+          details: data.error?.details,
+          timestamp: new Date().toISOString(),
+        },
       }
     }
 
     return {
       success: true,
-      data: data.data || data,
+      data: data.data !== undefined ? data.data : data,
       message: data.message,
-      pagination: data.pagination,
+      pagination: data.pagination || data.meta,
     }
   }
 
-  async get<T>(url: string, params?: Record<string, any>): Promise<ApiResponse<T>> {
+  async get<T>(url: string, params?: Record<string, any>): Promise<{ success: boolean; data?: T; error?: any; pagination?: any }> {
     try {
       let fullUrl = url
       if (params) {
@@ -109,7 +112,7 @@ class ApiClient {
     }
   }
 
-  async post<T>(url: string, data?: any): Promise<ApiResponse<T>> {
+  async post<T>(url: string, data?: any): Promise<{ success: boolean; data?: T; error?: any }> {
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -130,7 +133,28 @@ class ApiClient {
     }
   }
 
-  async put<T>(url: string, data?: any): Promise<ApiResponse<T>> {
+  async patch<T>(url: string, data?: any): Promise<{ success: boolean; data?: T; error?: any }> {
+    try {
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: data ? JSON.stringify(data) : undefined,
+      })
+
+      return this.handleResponse<T>(response)
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          message: error instanceof Error ? error.message : 'Network error occurred',
+          timestamp: new Date().toISOString(),
+        },
+      }
+    }
+  }
+
+  async put<T>(url: string, data?: any): Promise<{ success: boolean; data?: T; error?: any }> {
     try {
       const response = await fetch(url, {
         method: 'PUT',
@@ -151,7 +175,7 @@ class ApiClient {
     }
   }
 
-  async delete<T>(url: string): Promise<ApiResponse<T>> {
+  async delete<T>(url: string): Promise<{ success: boolean; data?: T; error?: any }> {
     try {
       const response = await fetch(url, {
         method: 'DELETE',

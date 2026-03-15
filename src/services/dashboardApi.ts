@@ -1,135 +1,85 @@
 /**
- * Dashboard API Service
- * API calls specific to the Dashboard page
+ * Dashboard API Service (re-exports from gyorsApi for backward compatibility)
  */
+import { fetchDashboardStats, fetchBookings, fetchRevenueAnalytics, fetchPendingKYC } from './gyorsApi'
 
-import apiClient from './apiClient'
-import API_ENDPOINTS from '../../mock/api-endpoints'
-import {
-  DashboardStatsRequest,
-  DashboardStatsResponse,
-  BookingListRequest,
-  BookingListResponse,
-  RevenueAnalyticsRequest,
-  RevenueAnalyticsResponse,
-  BookingStatsResponse,
-  KYCStatsResponse,
-} from '../../mock/api-schemas'
+export type DashboardStatsRequest = { dateFrom?: string; dateTo?: string }
+export type DashboardStatsResponse = { success: boolean; data?: any }
+export type BookingListRequest = { limit?: number; page?: number; status?: string }
+export type BookingListResponse = { success: boolean; data?: any[]; pagination?: any }
+export type RevenueAnalyticsRequest = { dateFrom?: string; dateTo?: string; granularity?: string }
+export type RevenueAnalyticsResponse = { success: boolean; data?: any[] }
+export type BookingStatsResponse = { success: boolean; data?: any }
+export type KYCStatsResponse = { success: boolean; data?: any }
 
-/**
- * Get dashboard statistics
- */
-export async function getDashboardStats(
-  params?: DashboardStatsRequest
-): Promise<DashboardStatsResponse> {
-  const response = await apiClient.get<DashboardStatsResponse['data']>(
-    API_ENDPOINTS.ANALYTICS.DASHBOARD_STATS,
-    params
-  )
-
-  if (!response.success || !response.data) {
-    throw new Error(response.error?.message || 'Failed to fetch dashboard stats')
-  }
-
-  return {
-    success: true,
-    data: response.data,
+export async function getDashboardStats(_params?: DashboardStatsRequest): Promise<DashboardStatsResponse> {
+  try {
+    const data = await fetchDashboardStats()
+    return { success: true, data }
+  } catch {
+    return { success: false }
   }
 }
 
-/**
- * Get recent bookings
- */
-export async function getRecentBookings(
-  params?: BookingListRequest
-): Promise<BookingListResponse> {
-  const response = await apiClient.get<BookingListResponse['data']>(
-    API_ENDPOINTS.BOOKINGS.LIST,
-    {
-      ...params,
-      limit: params?.limit || 10,
-      sortBy: 'bookingDate',
-      sortOrder: 'desc',
-    }
-  )
-
-  if (!response.success || !response.data) {
-    throw new Error(response.error?.message || 'Failed to fetch bookings')
-  }
-
-  return {
-    success: true,
-    data: response.data,
-    pagination: response.pagination,
+export async function getRecentBookings(params?: BookingListRequest): Promise<BookingListResponse> {
+  try {
+    const data = await fetchBookings(params as any)
+    return { success: true, data }
+  } catch {
+    return { success: false, data: [] }
   }
 }
 
-/**
- * Get booking statistics
- */
 export async function getBookingStats(): Promise<BookingStatsResponse> {
-  const response = await apiClient.get<BookingStatsResponse['data']>(
-    API_ENDPOINTS.BOOKINGS.STATS
-  )
-
-  if (!response.success || !response.data) {
-    throw new Error(response.error?.message || 'Failed to fetch booking stats')
-  }
-
-  return {
-    success: true,
-    data: response.data,
-  }
-}
-
-/**
- * Get revenue analytics (for productivity chart)
- */
-export async function getRevenueAnalytics(
-  params?: RevenueAnalyticsRequest
-): Promise<RevenueAnalyticsResponse> {
-  const response = await apiClient.get<RevenueAnalyticsResponse['data']>(
-    API_ENDPOINTS.ANALYTICS.REVENUE_ANALYTICS,
-    params
-  )
-
-  if (!response.success || !response.data) {
-    throw new Error(response.error?.message || 'Failed to fetch revenue analytics')
-  }
-
-  return {
-    success: true,
-    data: response.data,
+  try {
+    const bookings = await fetchBookings()
+    return {
+      success: true,
+      data: {
+        total: bookings.length,
+        pendingAssignment: bookings.filter((b: any) => b.status?.toLowerCase().includes('pending')).length,
+        inProgress: bookings.filter((b: any) => b.status?.toLowerCase().includes('progress')).length,
+        completed: bookings.filter((b: any) => b.status?.toLowerCase().includes('complete')).length,
+        cancelled: bookings.filter((b: any) => b.status?.toLowerCase().includes('cancel')).length,
+        totalRevenue: bookings.reduce((sum: number, b: any) => sum + (b.amount || 0), 0),
+        averageBookingValue: bookings.length ? bookings.reduce((sum: number, b: any) => sum + (b.amount || 0), 0) / bookings.length : 0,
+      }
+    }
+  } catch {
+    return { success: false }
   }
 }
 
-/**
- * Get KYC statistics
- */
+export async function getRevenueAnalytics(_params?: RevenueAnalyticsRequest): Promise<RevenueAnalyticsResponse> {
+  try {
+    const data = await fetchRevenueAnalytics()
+    return { success: true, data }
+  } catch {
+    return { success: false, data: [] }
+  }
+}
+
 export async function getKYCStats(): Promise<KYCStatsResponse> {
-  const response = await apiClient.get<KYCStatsResponse['data']>(
-    API_ENDPOINTS.KYC.STATS
-  )
-
-  if (!response.success || !response.data) {
-    throw new Error(response.error?.message || 'Failed to fetch KYC stats')
-  }
-
-  return {
-    success: true,
-    data: response.data,
+  try {
+    const list = await fetchPendingKYC()
+    return {
+      success: true,
+      data: {
+        pending: list.filter((k: any) => k.status?.toLowerCase() === 'pending').length,
+        approved: list.filter((k: any) => k.status?.toLowerCase() === 'approved').length,
+        rejected: list.filter((k: any) => k.status?.toLowerCase() === 'rejected').length,
+        total: list.length,
+      }
+    }
+  } catch {
+    return { success: false }
   }
 }
 
-/**
- * Get real-time metrics
- */
 export async function getRealTimeMetrics() {
-  const response = await apiClient.get(API_ENDPOINTS.ANALYTICS.REAL_TIME_METRICS)
-
-  if (!response.success || !response.data) {
-    throw new Error(response.error?.message || 'Failed to fetch real-time metrics')
+  try {
+    return await fetchDashboardStats()
+  } catch {
+    return {}
   }
-
-  return response.data
 }
