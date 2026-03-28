@@ -173,17 +173,38 @@ export async function updateBookingStatus(
 // ─── Pricing ──────────────────────────────────────────────────────────────────
 
 export interface PricingRule {
+  id?: string
   service_type: string
   city: string
-  base_price: number
+  base_price: number | string
   [key: string]: any
 }
 
 export interface SurgeRule {
-  pricingRuleId: string
-  multiplier: number
-  condition: string
+  id?: string
+  pricingRuleId?: string
+  PricingRuleid?: string
+  multiplier: number | string
+  condition: string | number
   [key: string]: any
+}
+
+export async function fetchPricingRules(): Promise<PricingRule[]> {
+  const res = await apiClient.get<any>(API_ENDPOINTS.PRICING.RULES_LIST)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to load pricing rules')
+  const data = res.data
+  if (Array.isArray(data)) return data
+  if (data?.data) return data.data
+  return []
+}
+
+export async function fetchSurgeRules(): Promise<SurgeRule[]> {
+  const res = await apiClient.get<any>(API_ENDPOINTS.PRICING.SURGE_LIST)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to load surge rules')
+  const data = res.data
+  if (Array.isArray(data)) return data
+  if (data?.data) return data.data
+  return []
 }
 
 export async function createPricingRule(data: PricingRule): Promise<any> {
@@ -195,6 +216,30 @@ export async function createPricingRule(data: PricingRule): Promise<any> {
 export async function createSurgeRule(data: SurgeRule): Promise<any> {
   const res = await apiClient.post(API_ENDPOINTS.PRICING.SURGE_CREATE, data)
   if (!res.success) throw new Error(res.error?.message || 'Failed to create surge rule')
+  return res.data
+}
+
+export async function updatePricingRule(id: string, data: Partial<PricingRule>): Promise<any> {
+  const res = await apiClient.patch(API_ENDPOINTS.PRICING.RULES_UPDATE(id), data)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to update pricing rule')
+  return res.data
+}
+
+export async function updateSurgeRule(id: string, data: Partial<SurgeRule>): Promise<any> {
+  const res = await apiClient.patch(API_ENDPOINTS.PRICING.SURGE_UPDATE(id), data)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to update surge rule')
+  return res.data
+}
+
+export async function deletePricingRule(id: string): Promise<any> {
+  const res = await apiClient.delete(API_ENDPOINTS.PRICING.RULES_DELETE(id))
+  if (!res.success) throw new Error(res.error?.message || 'Failed to delete pricing rule')
+  return res.data
+}
+
+export async function deleteSurgeRule(id: string): Promise<any> {
+  const res = await apiClient.delete(API_ENDPOINTS.PRICING.SURGE_DELETE(id))
+  if (!res.success) throw new Error(res.error?.message || 'Failed to delete surge rule')
   return res.data
 }
 
@@ -260,4 +305,81 @@ export async function fetchNotifications(all = false): Promise<AdminNotification
 export async function markNotificationRead(id: string): Promise<void> {
   const res = await apiClient.patch(API_ENDPOINTS.NOTIFICATIONS.MARK_READ(id))
   if (!res.success) throw new Error(res.error?.message || 'Failed to mark notification as read')
+}
+
+// ─── Service Providers ────────────────────────────────────────────────────────
+
+export interface ServiceProvider {
+  id: string
+  user_id: string
+  name: string
+  phoneNumber: string
+  city?: string
+  yearsOfExperience?: number
+  status: string
+  rating?: number
+  Kyc_status?: string
+  createdAt?: string
+  updatedAt?: string
+  user?: { id: string; name?: string; email?: string; phoneNumber?: string }
+  providerProfiles?: { id: string; services: string[]; experiences: string[] }[]
+  [key: string]: any
+}
+
+export interface ServiceProviderPayload {
+  user_id: string
+  name: string
+  phoneNumber: string
+  city?: string
+  yearsOfExperience?: number
+  status?: string
+}
+
+export interface ServiceProviderListParams {
+  name?: string
+  city?: string
+  status?: string
+}
+
+export async function fetchServiceProviders(
+  params?: ServiceProviderListParams
+): Promise<ServiceProvider[]> {
+  const res = await apiClient.get<any>(API_ENDPOINTS.SERVICE_PROVIDERS.LIST, params)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to load service providers')
+  const data = res.data
+  if (Array.isArray(data)) return data
+  if (data?.providers) return data.providers
+  if (data?.data) return data.data
+  return []
+}
+
+export async function fetchServiceProviderById(id: string): Promise<ServiceProvider> {
+  const res = await apiClient.get<ServiceProvider>(API_ENDPOINTS.SERVICE_PROVIDERS.DETAIL(id))
+  if (!res.success) throw new Error(res.error?.message || 'Failed to load service provider')
+  return res.data!
+}
+
+export async function createServiceProvider(data: ServiceProviderPayload): Promise<ServiceProvider> {
+  const res = await apiClient.post<ServiceProvider>(API_ENDPOINTS.SERVICE_PROVIDERS.CREATE, data)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to create service provider')
+  return res.data!
+}
+
+export async function updateServiceProvider(
+  id: string,
+  data: Partial<ServiceProviderPayload>
+): Promise<ServiceProvider> {
+  const res = await apiClient.patch<ServiceProvider>(API_ENDPOINTS.SERVICE_PROVIDERS.UPDATE(id), data)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to update service provider')
+  return res.data!
+}
+
+export async function updateServiceProviderStatus(id: string, status: string): Promise<void> {
+  const res = await apiClient.patch(API_ENDPOINTS.SERVICE_PROVIDERS.UPDATE_STATUS(id), { status })
+  if (!res.success) throw new Error(res.error?.message || 'Failed to update status')
+}
+
+export async function deleteServiceProvider(id: string): Promise<void> {
+  const res = await apiClient.delete(API_ENDPOINTS.SERVICE_PROVIDERS.DELETE(id))
+  if (!res.success) throw new Error(res.error?.message || 'Failed to delete service provider')
 }

@@ -55,13 +55,13 @@ export default function BookingManagement() {
 
   const filteredBookings = bookings.filter(b => {
     const id = b.id || ''
-    const service = b.serviceName || b.serviceItemId || ''
-    const customer = b.customerName || b.customerId || ''
-    const matchSearch = !searchTerm ||
-      id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      service.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchStatus = filterStatus === 'all' || b.status?.toLowerCase().includes(filterStatus.toLowerCase())
+    const serviceName = b.service?.name || b.serviceId || ''
+    const customerName = b.user?.name || b.userId || ''
+    const providerName = b.provider?.name || b.providerId || ''
+    const searchString = `${id} ${serviceName} ${customerName} ${providerName}`.toLowerCase()
+    
+    const matchSearch = !searchTerm || searchString.includes(searchTerm.toLowerCase())
+    const matchStatus = filterStatus === 'all' || b.status?.toLowerCase() === filterStatus.toLowerCase()
     return matchSearch && matchStatus
   })
 
@@ -163,14 +163,14 @@ export default function BookingManagement() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">{booking.serviceName || booking.serviceItemId || '—'}</div>
+                      <div className="text-sm font-medium text-gray-900">{booking.service?.name || booking.serviceId || '—'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {booking.customerName || booking.customerId || '—'}
+                      {booking.user?.name || booking.user?.phoneNumber || booking.userId || '—'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {booking.providerName || booking.providerId
-                        ? <div className="text-sm text-gray-900">{booking.providerName || booking.providerId}</div>
+                      {booking.provider?.name || booking.providerId
+                        ? <div className="text-sm text-gray-900">{booking.provider?.name || booking.providerId}</div>
                         : <span className="text-sm text-orange-600 font-medium">Not Assigned</span>}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -179,10 +179,10 @@ export default function BookingManagement() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{formatAmount(booking.amount)}</div>
+                      <div className="text-sm font-medium text-gray-900">{formatAmount(booking.totalAmount || booking.amount)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {booking.scheduledAt ? new Date(booking.scheduledAt).toLocaleDateString('en-IN') : '—'}
+                      {booking.date || booking.scheduledAt ? new Date(booking.date || booking.scheduledAt).toLocaleDateString('en-IN') : '—'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {actionLoading === booking.id ? (
@@ -195,7 +195,7 @@ export default function BookingManagement() {
                               <XCircle size={18} />
                             </button>
                           )}
-                          {booking.status?.toLowerCase().includes('progress') && (
+                          {(booking.status?.toLowerCase().includes('progress') || booking.status?.toLowerCase().includes('started')) && (
                             <button onClick={() => handleStatusUpdate(booking.id, 'COMPLETED')}
                               title="Mark complete" className="text-green-600 hover:text-green-900">
                               <CheckCircle size={18} />

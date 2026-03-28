@@ -3,6 +3,7 @@ import {
   LayoutDashboard, 
   Clock, 
   Users,
+  UserCog,
   FileCheck,
   Calendar,
   DollarSign,
@@ -14,7 +15,7 @@ import { useAuth, UserRole } from '../context/AuthContext'
 
 interface MenuItem {
   path: string
-  icon: React.ComponentType<{ size?: number }>
+  icon: any
   label: string
   requiredRoles: UserRole[]
 }
@@ -22,6 +23,7 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard', requiredRoles: ['Super Admin', 'Operations Admin', 'Finance Admin', 'Support Agent', 'Compliance Officer'] },
   { path: '/users', icon: Users, label: 'User Management', requiredRoles: ['Super Admin', 'Operations Admin'] },
+  { path: '/providers', icon: UserCog, label: 'Service Providers', requiredRoles: ['Super Admin', 'Operations Admin'] },
   { path: '/kyc', icon: FileCheck, label: 'KYC & Verification', requiredRoles: ['Super Admin', 'Compliance Officer'] },
   { path: '/bookings', icon: Calendar, label: 'Booking Management', requiredRoles: ['Super Admin', 'Operations Admin', 'Support Agent'] },
   { path: '/pricing', icon: DollarSign, label: 'Pricing & Commission', requiredRoles: ['Super Admin', 'Finance Admin'] },

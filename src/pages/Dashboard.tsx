@@ -104,9 +104,9 @@ export default function Dashboard() {
             <div>
               <p className="text-gray-500 text-sm">Total Bookings</p>
               <p className="text-3xl font-bold mt-2">{Number(totalBookings).toLocaleString()}</p>
-              <p className="text-green-600 text-sm mt-1 flex items-center gap-1">
-                <TrendingUp size={14} />
-                {stats.bookingsGrowth ? `+${stats.bookingsGrowth}%` : 'Live data'} 
+              <p className={`text-sm mt-1 flex items-center gap-1 ${stats.bookingsGrowth !== undefined ? (stats.bookingsGrowth >= 0 ? 'text-green-600' : 'text-red-500') : 'text-green-600'}`}>
+                <TrendingUp size={14} className={stats.bookingsGrowth !== undefined && stats.bookingsGrowth < 0 ? 'rotate-180' : ''} />
+                {stats.bookingsGrowth !== undefined ? `${stats.bookingsGrowth > 0 ? '+' : ''}${stats.bookingsGrowth}%` : 'Live data'} 
               </p>
             </div>
             <div className="bg-blue-100 p-3 rounded-lg"><Calendar size={24} className="text-blue-600" /></div>
@@ -118,9 +118,9 @@ export default function Dashboard() {
             <div>
               <p className="text-gray-500 text-sm">Active Users</p>
               <p className="text-3xl font-bold mt-2">{Number(activeUsers).toLocaleString()}</p>
-              <p className="text-green-600 text-sm mt-1 flex items-center gap-1">
-                <TrendingUp size={14} />
-                {stats.usersGrowth ? `+${stats.usersGrowth}%` : 'Live data'}
+              <p className={`text-sm mt-1 flex items-center gap-1 ${stats.usersGrowth !== undefined ? (stats.usersGrowth >= 0 ? 'text-green-600' : 'text-red-500') : 'text-green-600'}`}>
+                <TrendingUp size={14} className={stats.usersGrowth !== undefined && stats.usersGrowth < 0 ? 'rotate-180' : ''} />
+                {stats.usersGrowth !== undefined ? `${stats.usersGrowth > 0 ? '+' : ''}${stats.usersGrowth}%` : 'Live data'}
               </p>
             </div>
             <div className="bg-green-100 p-3 rounded-lg"><Users size={24} className="text-green-600" /></div>
@@ -132,9 +132,9 @@ export default function Dashboard() {
             <div>
               <p className="text-gray-500 text-sm">Revenue</p>
               <p className="text-3xl font-bold mt-2">{formatAmount(Number(revenue))}</p>
-              <p className="text-green-600 text-sm mt-1 flex items-center gap-1">
-                <TrendingUp size={14} />
-                {stats.revenueGrowth ? `+${stats.revenueGrowth}%` : 'Live data'}
+              <p className={`text-sm mt-1 flex items-center gap-1 ${stats.revenueGrowth !== undefined ? (stats.revenueGrowth >= 0 ? 'text-green-600' : 'text-red-500') : 'text-green-600'}`}>
+                <TrendingUp size={14} className={stats.revenueGrowth !== undefined && stats.revenueGrowth < 0 ? 'rotate-180' : ''} />
+                {stats.revenueGrowth !== undefined ? `${stats.revenueGrowth > 0 ? '+' : ''}${stats.revenueGrowth}%` : 'Live data'}
               </p>
             </div>
             <div className="bg-purple-100 p-3 rounded-lg"><DollarSign size={24} className="text-purple-600" /></div>
@@ -188,13 +188,13 @@ export default function Dashboard() {
                   <tr key={booking.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-xs font-mono text-gray-500">{booking.id?.slice(0, 8)}…</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {booking.serviceName || booking.serviceItemId || '—'}
+                      {booking.serviceName || booking.service?.name || booking.serviceId || '—'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {booking.customerName || booking.customerId || '—'}
+                      {booking.customerName || booking.user?.name || booking.userId || '—'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {booking.providerName || booking.providerId || <span className="text-orange-500">Not Assigned</span>}
+                      {booking.providerName || booking.provider?.name || booking.providerId || <span className="text-orange-500">Not Assigned</span>}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(booking.status)}`}>
@@ -205,7 +205,7 @@ export default function Dashboard() {
                       {formatDate(booking.scheduledAt || booking.createdAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {booking.amount != null ? formatAmount(booking.amount) : '—'}
+                      {booking.totalAmount != null ? formatAmount(Number(booking.totalAmount)) : '—'}
                     </td>
                   </tr>
                 ))}

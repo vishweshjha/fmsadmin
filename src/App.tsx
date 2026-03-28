@@ -4,6 +4,7 @@ import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
+import ForgotPassword from './pages/ForgotPassword'
 import Unauthorized from './pages/Unauthorized'
 import Dashboard from './pages/Dashboard'
 import UserManagement from './pages/UserManagement'
@@ -13,6 +14,7 @@ import PricingManagement from './pages/PricingManagement'
 import SettlementsFinance from './pages/SettlementsFinance'
 import AnalyticsReporting from './pages/AnalyticsReporting'
 import AuditLogging from './pages/AuditLogging'
+import ServiceProviderManagement from './pages/ServiceProviderManagement'
 import { UserRole } from './context/AuthContext'
 
 // Role-based route permissions
@@ -25,6 +27,7 @@ const rolePermissions: Record<string, UserRole[]> = {
   '/settlements': ['Super Admin', 'Finance Admin'],
   '/analytics': ['Super Admin', 'Operations Admin', 'Finance Admin'],
   '/audit': ['Super Admin', 'Compliance Officer'],
+  '/providers': ['Super Admin', 'Operations Admin'],
 }
 
 function AppRoutes() {
@@ -40,6 +43,10 @@ function AppRoutes() {
       <Route
         path="/signup"
         element={isAuthenticated ? <Navigate to="/" replace /> : <Signup />}
+      />
+      <Route
+        path="/forgot-password"
+        element={isAuthenticated ? <Navigate to="/" replace /> : <ForgotPassword />}
       />
       <Route path="/unauthorized" element={<Unauthorized />} />
 
@@ -120,6 +127,16 @@ function AppRoutes() {
           <ProtectedRoute requiredRoles={rolePermissions['/audit']}>
             <Layout>
               <AuditLogging />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/providers"
+        element={
+          <ProtectedRoute requiredRoles={rolePermissions['/providers']}>
+            <Layout>
+              <ServiceProviderManagement />
             </Layout>
           </ProtectedRoute>
         }

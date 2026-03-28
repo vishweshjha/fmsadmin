@@ -13,7 +13,7 @@ export interface User {
 
 interface AuthContextType {
   user: User | null
-  login: (email: string, password: string) => Promise<boolean>
+  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>
   signup: (name: string, email: string, password: string, role: UserRole) => Promise<{ success: boolean; message?: string }>
   logout: () => void
   isAuthenticated: boolean
@@ -23,8 +23,11 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 // Admin auth always goes to the LOCAL fmsadmin backend (not the Gyors GCP backend)
-// The local backend has prefix /v1 and runs on port 3000
-const LOCAL_ADMIN_API = 'http://localhost:3000/v1'
+// The local backend uses global prefix /api and runs on port 3000
+export const LOCAL_ADMIN_API = 'http://localhost:3000/api'
+export const ADMIN_AUTH_LOGIN = `${LOCAL_ADMIN_API}/auth/admin/login`
+export const ADMIN_AUTH_SIGNUP = `${LOCAL_ADMIN_API}/auth/admin/signup`
+export const ADMIN_AUTH_FORGOT = `${LOCAL_ADMIN_API}/auth/admin/forgot-password`
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -39,9 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
     try {
-      const response = await fetch(`${LOCAL_ADMIN_API}/auth/login`, {
+      const response = await fetch(ADMIN_AUTH_LOGIN, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -50,8 +53,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const responseData = await response.json()
 
       if (!response.ok) {
-        console.error('Login failed:', responseData.message || responseData.error?.message || 'Unknown error')
-        return false
+        // Surface the real backend message so the UI can show it
+        const serverMessage =
+          (Array.isArray(responseData.message)
+            ? responseData.message.join(', ')
+            : responseData.message) ||
+          responseData.error?.message ||
+          'Invalid email or password'
+        console.error('Login failed:', serverMessage)
+        return { success: false, message: serverMessage }
       }
 
       // Local backend wraps in { success, data: { user, token } } via TransformInterceptor
@@ -60,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!token) {
         console.error('No token in login response', responseData)
-        return false
+        return { success: false, message: 'Login succeeded but no token was returned. Please contact support.' }
       }
 
       const roleMap: Record<string, UserRole> = {
@@ -85,10 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('fms_admin_token', token)
       apiClient.setToken(token)
 
-      return true
+      return { success: true }
     } catch (error) {
       console.error('Login error:', error)
-      return false
+      return { success: false, message: 'Network error — is the local backend running?' }
     }
   }
 
@@ -107,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         'Compliance Officer': 'COMPLIANCE_OFFICER',
       }
 
-      const response = await fetch(`${LOCAL_ADMIN_API}/auth/signup`, {
+      const response = await fetch(ADMIN_AUTH_SIGNUP, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

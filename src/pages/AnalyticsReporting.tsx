@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Download, Calendar, TrendingUp, Users, DollarSign, Clock, MapPin } from 'lucide-react'
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts'
+import { Download, Calendar, TrendingUp, Users, DollarSign, Clock } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts'
 
 const demandSupplyData = [
   { hour: '00:00', demand: 5, supply: 8 },

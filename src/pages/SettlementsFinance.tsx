@@ -1,13 +1,80 @@
-import { useState, useEffect } from 'react'
-import { Download, DollarSign, TrendingUp, FileText, RefreshCw, Loader2, AlertCircle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import {
+  Download,
+  DollarSign,
+  TrendingUp,
+  FileText,
+  RefreshCw,
+  Loader2,
+  AlertCircle,
+  ChevronDown,
+  FileSpreadsheet,
+} from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { fetchWallets, fetchSettlements, type Wallet, type Settlement } from '../services/gyorsApi'
+import { exportToCSV, exportToPDF, formatAmountPlain } from '../utils/exportUtils'
 
 const revenueData = [
   { month: 'Jan', revenue: 420000, payouts: 315000 },
   { month: 'Feb', revenue: 480000, payouts: 360000 },
   { month: 'Mar', revenue: 520000, payouts: 390000 },
 ]
+
+// ─── Export Dropdown ──────────────────────────────────────────────────────────
+
+interface ExportDropdownProps {
+  onCSV: () => void
+  onPDF: () => void
+  label?: string
+}
+
+function ExportDropdown({ onCSV, onPDF, label = 'Export' }: ExportDropdownProps) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2 transition-colors"
+      >
+        <Download size={18} />
+        {label}
+        <ChevronDown size={16} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
+          <button
+            onClick={() => { onCSV(); setOpen(false) }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <FileSpreadsheet size={16} className="text-green-600" />
+            Export as CSV
+          </button>
+          <div className="border-t border-gray-100" />
+          <button
+            onClick={() => { onPDF(); setOpen(false) }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <FileText size={16} className="text-red-500" />
+            Export as PDF
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function SettlementsFinance() {
   const [activeTab, setActiveTab] = useState<'providers' | 'settlements' | 'reports'>('providers')
@@ -33,7 +100,8 @@ export default function SettlementsFinance() {
   useEffect(() => { loadData() }, [])
 
   const totalWalletBalance = wallets.reduce((sum, w) => sum + (w.balance || 0), 0)
-  const formatAmount = (n: number) => n >= 100000 ? `₹${(n / 100000).toFixed(1)}L` : `₹${n.toLocaleString('en-IN')}`
+  const formatAmount = (n: number) =>
+    n >= 100000 ? `₹${(n / 100000).toFixed(1)}L` : `₹${n.toLocaleString('en-IN')}`
 
   const getStatusCls = (status?: string) => {
     const s = status?.toLowerCase() || ''
@@ -42,20 +110,94 @@ export default function SettlementsFinance() {
     return 'bg-yellow-100 text-yellow-800'
   }
 
+  // ─── Export Handlers ─────────────────────────────────────────────────────────
+
+  const walletHeaders = ['Wallet ID', 'User ID', 'Balance (₹)', 'Currency']
+  const walletRows = () =>
+    wallets.map((w) => [
+      w.id ?? '',
+      w.userId ?? '',
+      w.balance ?? 0,
+      w.currency ?? 'INR',
+    ])
+
+  const settlementHeaders = ['Settlement ID', 'Amount (₹)', 'Status', 'Date']
+  const settlementRows = () =>
+    settlements.map((s) => [
+      s.id ?? '',
+      s.amount ?? 0,
+      s.status ?? 'Unknown',
+      s.createdAt ? new Date(s.createdAt).toLocaleDateString('en-IN') : '',
+    ])
+
+  const revenueHeaders = ['Month', 'Revenue (₹)', 'Payouts (₹)', 'Net (₹)']
+  const revenueRows = () =>
+    revenueData.map((r) => [r.month, r.revenue, r.payouts, r.revenue - r.payouts])
+
+  // Wallets
+  const handleWalletsCSV = () =>
+    exportToCSV('wallets', walletHeaders, walletRows())
+  const handleWalletsPDF = () =>
+    exportToPDF(
+      'Wallets Report',
+      `Total Balance: ${formatAmountPlain(totalWalletBalance)} across ${wallets.length} wallets`,
+      walletHeaders,
+      walletRows()
+    )
+
+  // Settlements
+  const handleSettlementsCSV = () =>
+    exportToCSV('settlements', settlementHeaders, settlementRows())
+  const handleSettlementsPDF = () =>
+    exportToPDF(
+      'Settlements Report',
+      `${settlements.length} total settlement records`,
+      settlementHeaders,
+      settlementRows()
+    )
+
+  // Revenue (Reports tab)
+  const handleRevenueCSV = () =>
+    exportToCSV('revenue_report', revenueHeaders, revenueRows())
+  const handleRevenuePDF = () =>
+    exportToPDF(
+      'Revenue vs Payouts Report',
+      'Monthly financial summary',
+      revenueHeaders,
+      revenueRows()
+    )
+
+  // Active-tab-aware export for the top header button
+  const handlePageExportCSV = () => {
+    if (activeTab === 'providers') handleWalletsCSV()
+    else if (activeTab === 'settlements') handleSettlementsCSV()
+    else handleRevenueCSV()
+  }
+  const handlePageExportPDF = () => {
+    if (activeTab === 'providers') handleWalletsPDF()
+    else if (activeTab === 'settlements') handleSettlementsPDF()
+    else handleRevenuePDF()
+  }
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Settlements & Finance</h1>
+          <h1 className="text-3xl font-bold">Settlements &amp; Finance</h1>
           <p className="text-gray-500 mt-1">Manage wallets and financial settlements</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={loadData} className="flex items-center gap-2 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50">
+          <button
+            onClick={loadData}
+            className="flex items-center gap-2 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+          >
             <RefreshCw size={18} /> Refresh
           </button>
-          <button className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2">
-            <Download size={18} /> Export
-          </button>
+          <ExportDropdown
+            onCSV={handlePageExportCSV}
+            onPDF={handlePageExportPDF}
+          />
         </div>
       </div>
 
@@ -107,13 +249,16 @@ export default function SettlementsFinance() {
       <div className="bg-white rounded-lg shadow">
         <div className="border-b border-gray-200">
           <nav className="flex -mb-px">
-            {(['providers', 'settlements', 'reports'] as const).map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)}
+            {(['providers', 'settlements', 'reports'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
                 className={`px-6 py-4 text-sm font-medium border-b-2 capitalize ${
                   activeTab === tab
                     ? 'border-primary-500 text-primary-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}>
+                }`}
+              >
                 {tab === 'providers' ? 'Wallets' : tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
@@ -134,78 +279,164 @@ export default function SettlementsFinance() {
               <div>
                 <p className="text-red-800 font-semibold text-sm">Error loading data</p>
                 <p className="text-red-600 text-sm">{error}</p>
-                <button onClick={loadData} className="mt-2 px-3 py-1 bg-red-600 text-white rounded text-xs">Retry</button>
+                <button onClick={loadData} className="mt-2 px-3 py-1 bg-red-600 text-white rounded text-xs">
+                  Retry
+                </button>
               </div>
             </div>
           ) : (
             <>
               {/* Wallets Tab */}
               {activeTab === 'providers' && (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        {['Wallet ID', 'User ID', 'Balance', 'Currency', 'Actions'].map(h => (
-                          <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {wallets.length === 0 ? (
-                        <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500">No wallets found</td></tr>
-                      ) : wallets.map((wallet) => (
-                        <tr key={wallet.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">{wallet.id?.slice(0, 12)}…</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{wallet.userId || '—'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                            {formatAmount(wallet.balance || 0)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{wallet.currency || 'INR'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <button className="text-primary-600 hover:text-primary-900">
-                              <FileText size={18} />
-                            </button>
-                          </td>
+                <div>
+                  {/* Tab-level export bar */}
+                  <div className="flex justify-between items-center mb-4">
+                    <p className="text-sm text-gray-500">{wallets.length} wallets</p>
+                    <ExportDropdown
+                      label="Export Wallets"
+                      onCSV={handleWalletsCSV}
+                      onPDF={handleWalletsPDF}
+                    />
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          {['Wallet ID', 'User ID', 'Balance', 'Currency', 'Actions'].map((h) => (
+                            <th
+                              key={h}
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                            >
+                              {h}
+                            </th>
+                          ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {wallets.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                              No wallets found
+                            </td>
+                          </tr>
+                        ) : (
+                          wallets.map((wallet) => (
+                            <tr key={wallet.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">
+                                {wallet.id?.slice(0, 12)}…
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                {wallet.userId || '—'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                                {formatAmount(wallet.balance || 0)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {wallet.currency || 'INR'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <button
+                                  title="Export this wallet"
+                                  onClick={() =>
+                                    exportToPDF(
+                                      `Wallet – ${wallet.id}`,
+                                      `User: ${wallet.userId ?? '—'}`,
+                                      walletHeaders,
+                                      [[wallet.id, wallet.userId ?? '', wallet.balance ?? 0, wallet.currency ?? 'INR']]
+                                    )
+                                  }
+                                  className="text-primary-600 hover:text-primary-900"
+                                >
+                                  <FileText size={18} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
               {/* Settlements Tab */}
               {activeTab === 'settlements' && (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        {['Settlement ID', 'Amount', 'Status', 'Date', 'Actions'].map(h => (
-                          <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {settlements.length === 0 ? (
-                        <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500">No settlements found</td></tr>
-                      ) : settlements.map((s) => (
-                        <tr key={s.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">{s.id?.slice(0, 12)}…</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{formatAmount(s.amount || 0)}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusCls(s.status)}`}>
-                              {s.status || 'Unknown'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {s.createdAt ? new Date(s.createdAt).toLocaleDateString('en-IN') : '—'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <button className="text-primary-600 hover:text-primary-900"><FileText size={18} /></button>
-                          </td>
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <p className="text-sm text-gray-500">{settlements.length} records</p>
+                    <ExportDropdown
+                      label="Export Settlements"
+                      onCSV={handleSettlementsCSV}
+                      onPDF={handleSettlementsPDF}
+                    />
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          {['Settlement ID', 'Amount', 'Status', 'Date', 'Actions'].map((h) => (
+                            <th
+                              key={h}
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                            >
+                              {h}
+                            </th>
+                          ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {settlements.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                              No settlements found
+                            </td>
+                          </tr>
+                        ) : (
+                          settlements.map((s) => (
+                            <tr key={s.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">
+                                {s.id?.slice(0, 12)}…
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                                {formatAmount(s.amount || 0)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusCls(s.status)}`}>
+                                  {s.status || 'Unknown'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {s.createdAt ? new Date(s.createdAt).toLocaleDateString('en-IN') : '—'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <button
+                                  title="Export this settlement"
+                                  onClick={() =>
+                                    exportToPDF(
+                                      `Settlement – ${s.id}`,
+                                      `Amount: ${formatAmountPlain(s.amount ?? 0)} · Status: ${s.status ?? 'Unknown'}`,
+                                      settlementHeaders,
+                                      [
+                                        [
+                                          s.id,
+                                          s.amount ?? 0,
+                                          s.status ?? 'Unknown',
+                                          s.createdAt ? new Date(s.createdAt).toLocaleDateString('en-IN') : '',
+                                        ],
+                                      ]
+                                    )
+                                  }
+                                  className="text-primary-600 hover:text-primary-900"
+                                >
+                                  <FileText size={18} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
@@ -213,32 +444,68 @@ export default function SettlementsFinance() {
               {activeTab === 'reports' && (
                 <div className="space-y-6">
                   <div className="bg-gray-50 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold mb-4">Revenue vs Payouts (Monthly)</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold">Revenue vs Payouts (Monthly)</h3>
+                      <ExportDropdown
+                        label="Export Report"
+                        onCSV={handleRevenueCSV}
+                        onPDF={handleRevenuePDF}
+                      />
+                    </div>
                     <ResponsiveContainer width="100%" height={300}>
                       <BarChart data={revenueData}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="month" />
                         <YAxis />
-                        <Tooltip formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, '']} />
+                        <Tooltip
+                          formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, '']}
+                        />
                         <Legend />
                         <Bar dataKey="revenue" fill="#3b82f6" name="Revenue" />
                         <Bar dataKey="payouts" fill="#10b981" name="Payouts" />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <button className="bg-white border border-gray-300 rounded-lg p-4 hover:bg-gray-50 flex items-center gap-3">
-                      <FileText className="text-primary-600" size={24} />
+                    <button
+                      onClick={handleRevenueCSV}
+                      className="bg-white border border-gray-300 rounded-lg p-4 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                    >
+                      <FileSpreadsheet className="text-green-600" size={24} />
                       <div className="text-left">
-                        <p className="font-semibold">Generate Invoice</p>
-                        <p className="text-sm text-gray-500">Create invoice for selected period</p>
+                        <p className="font-semibold">Export Revenue CSV</p>
+                        <p className="text-sm text-gray-500">Monthly revenue &amp; payout breakdown</p>
                       </div>
                     </button>
-                    <button className="bg-white border border-gray-300 rounded-lg p-4 hover:bg-gray-50 flex items-center gap-3">
-                      <FileText className="text-green-600" size={24} />
+                    <button
+                      onClick={handleRevenuePDF}
+                      className="bg-white border border-gray-300 rounded-lg p-4 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                    >
+                      <FileText className="text-red-500" size={24} />
                       <div className="text-left">
-                        <p className="font-semibold">Tax Report</p>
-                        <p className="text-sm text-gray-500">Generate tax compliance report</p>
+                        <p className="font-semibold">Export Revenue PDF</p>
+                        <p className="text-sm text-gray-500">Printable financial summary report</p>
+                      </div>
+                    </button>
+                    <button
+                      onClick={handleWalletsCSV}
+                      className="bg-white border border-gray-300 rounded-lg p-4 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                    >
+                      <FileSpreadsheet className="text-blue-600" size={24} />
+                      <div className="text-left">
+                        <p className="font-semibold">Export All Wallets CSV</p>
+                        <p className="text-sm text-gray-500">Complete wallets data export</p>
+                      </div>
+                    </button>
+                    <button
+                      onClick={handleSettlementsCSV}
+                      className="bg-white border border-gray-300 rounded-lg p-4 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                    >
+                      <FileSpreadsheet className="text-orange-600" size={24} />
+                      <div className="text-left">
+                        <p className="font-semibold">Export All Settlements CSV</p>
+                        <p className="text-sm text-gray-500">Complete settlements history export</p>
                       </div>
                     </button>
                   </div>

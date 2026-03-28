@@ -64,16 +64,6 @@ const auditLogs = [
   },
 ]
 
-const actionTypes = [
-  'All Actions',
-  'User Management',
-  'Booking Management',
-  'KYC & Verification',
-  'Pricing Updates',
-  'Financial Operations',
-  'System Configuration'
-]
-
 export default function AuditLogging() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterAction, setFilterAction] = useState('all')

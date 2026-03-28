@@ -18,11 +18,11 @@ export default function Login() {
     setLoading(true)
 
     try {
-      const success = await login(email, password)
-      if (success) {
+      const result = await login(email, password)
+      if (result.success) {
         navigate('/')
       } else {
-        setError('Invalid email or password')
+        setError(result.message || 'Invalid email or password')
       }
     } catch (err) {
       setError('An error occurred. Please try again.')

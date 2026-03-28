@@ -3,6 +3,7 @@
  * Base URL: https://gyors-backend-311476989793.us-central1.run.app/api
  */
 
+// const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 const BASE_URL = import.meta.env.VITE_API_URL || 'https://gyors-backend-311476989793.us-central1.run.app/api'
 
 export const API_ENDPOINTS = {
@@ -48,7 +49,13 @@ export const API_ENDPOINTS = {
   // Admin - Pricing & Finance
   PRICING: {
     RULES_CREATE: `${BASE_URL}/admin/pricing-rules`,
+    RULES_LIST: `${BASE_URL}/admin/pricing-rules`,
+    RULES_UPDATE: (id: string) => `${BASE_URL}/admin/pricing-rules/${id}`,
+    RULES_DELETE: (id: string) => `${BASE_URL}/admin/pricing-rules/${id}`,
     SURGE_CREATE: `${BASE_URL}/admin/surge-rules`,
+    SURGE_LIST: `${BASE_URL}/admin/surge-rules`,
+    SURGE_UPDATE: (id: string) => `${BASE_URL}/admin/surge-rules/${id}`,
+    SURGE_DELETE: (id: string) => `${BASE_URL}/admin/surge-rules/${id}`,
     WALLETS: `${BASE_URL}/admin/wallets`,
   },
 
@@ -76,6 +83,16 @@ export const API_ENDPOINTS = {
     HEALTH_CHECK: `${BASE_URL}/health`,
     SERVICE_CATEGORIES: `${BASE_URL}/services/categories`,
     SERVICE_SEARCH: `${BASE_URL}/services/search`,
+  },
+
+  // Admin - Service Provider Management
+  SERVICE_PROVIDERS: {
+    LIST: `${BASE_URL}/admin/service-providers`,
+    DETAIL: (id: string) => `${BASE_URL}/admin/service-providers/${id}`,
+    CREATE: `${BASE_URL}/admin/service-providers`,
+    UPDATE: (id: string) => `${BASE_URL}/admin/service-providers/${id}`,
+    UPDATE_STATUS: (id: string) => `${BASE_URL}/admin/service-providers/${id}/status`,
+    DELETE: (id: string) => `${BASE_URL}/admin/service-providers/${id}`,
   },
 } as const
 
