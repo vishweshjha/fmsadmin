@@ -42,6 +42,7 @@ export const API_ENDPOINTS = {
     DETAIL: (id: string) => `${BASE_URL}/admin/bookings/${id}`,
     UPDATE_STATUS: (id: string) => `${BASE_URL}/admin/bookings/${id}/status`,
     CANCEL: (id: string) => `${BASE_URL}/admin/bookings/${id}/status`,
+    ASSIGN: (id: string) => `${BASE_URL}/admin/bookings/${id}/assign`,
     STATS: `${BASE_URL}/admin/bookings`,
     EXPORT: `${BASE_URL}/admin/bookings/export`,
   },

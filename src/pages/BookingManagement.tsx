@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Search, RefreshCw, XCircle, Clock, CheckCircle, Loader2, AlertCircle, UserPlus } from 'lucide-react'
-import { fetchBookings, updateBookingStatus, type AdminBooking } from '../services/gyorsApi'
+import { fetchBookings, updateBookingStatus, assignProviderToBooking, fetchServiceProviders, type AdminBooking, type ServiceProvider } from '../services/gyorsApi'
 
 export default function BookingManagement() {
   const [bookings, setBookings] = useState<AdminBooking[]>([])
+  const [providers, setProviders] = useState<ServiceProvider[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -25,7 +26,32 @@ export default function BookingManagement() {
     }
   }
 
-  useEffect(() => { loadBookings() }, [])
+  const loadProviders = async () => {
+    try {
+      const data = await fetchServiceProviders({ status: 'ACTIVE' })
+      setProviders(data)
+    } catch (err) {
+      console.error('Failed to load operators', err)
+    }
+  }
+
+  useEffect(() => { 
+    loadBookings() 
+    loadProviders()
+  }, [])
+
+  const handleAssignProvider = async (bookingId: string, providerId: string) => {
+    if (!providerId) return
+    setActionLoading(bookingId)
+    try {
+      await assignProviderToBooking(bookingId, providerId)
+      await loadBookings() // Refresh bookings to show the assigned provider and updated status
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to assign provider')
+    } finally {
+      setActionLoading(null)
+    }
+  }
 
   const handleStatusUpdate = async (id: string, status: string, reason?: string) => {
     setActionLoading(id)
@@ -37,6 +63,17 @@ export default function BookingManagement() {
     } finally {
       setActionLoading(null)
     }
+  }
+
+  const handleCancelClick = (id: string, currentStatus: string) => {
+    if (currentStatus?.toLowerCase().includes('cancel')) return
+    const reason = window.prompt('Please enter the reason for cancellation:\n\nNote: If the customer already paid, a refund will automatically be triggered to their source.')
+    if (reason === null) return // user dismissed the prompt
+    if (reason.trim() === '') {
+      alert('A cancellation reason is strictly required to cancel and log this action.')
+      return
+    }
+    handleStatusUpdate(id, 'CANCELLED', reason.trim())
   }
 
   const getStatusBadge = (status: string) => {
@@ -171,7 +208,20 @@ export default function BookingManagement() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       {booking.provider?.name || booking.providerId
                         ? <div className="text-sm text-gray-900">{booking.provider?.name || booking.providerId}</div>
-                        : <span className="text-sm text-orange-600 font-medium">Not Assigned</span>}
+                        : (
+                          <div className="flex flex-col gap-1">
+                            <select 
+                               onChange={(e) => handleAssignProvider(booking.id, e.target.value)}
+                               defaultValue=""
+                               className="text-xs border border-orange-300 text-orange-700 bg-orange-50 rounded-md py-1 px-2 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                            >
+                               <option value="" disabled>Assign Provider ▼</option>
+                               {providers.map(p => (
+                                 <option key={p.id} value={p.id}>{p.name} ({p.city || 'Any'})</option>
+                               ))}
+                            </select>
+                          </div>
+                        )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(booking.status)}`}>
@@ -190,7 +240,7 @@ export default function BookingManagement() {
                       ) : (
                         <div className="flex items-center gap-2">
                           {!booking.status?.toLowerCase().includes('cancel') && (
-                            <button onClick={() => handleStatusUpdate(booking.id, 'CANCELLED', 'Admin override')}
+                            <button onClick={() => handleCancelClick(booking.id, booking.status)}
                               title="Cancel booking" className="text-red-600 hover:text-red-900">
                               <XCircle size={18} />
                             </button>

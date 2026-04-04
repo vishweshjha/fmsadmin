@@ -170,6 +170,14 @@ export async function updateBookingStatus(
   if (!res.success) throw new Error(res.error?.message || 'Failed to update booking status')
 }
 
+export async function assignProviderToBooking(
+  id: string,
+  providerId: string
+): Promise<void> {
+  const res = await apiClient.patch(API_ENDPOINTS.BOOKINGS.ASSIGN(id), { providerId })
+  if (!res.success) throw new Error(res.error?.message || 'Failed to assign provider')
+}
+
 // ─── Pricing ──────────────────────────────────────────────────────────────────
 
 export interface PricingRule {
