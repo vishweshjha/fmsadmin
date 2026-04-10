@@ -289,6 +289,12 @@ export async function fetchSettlements(): Promise<Settlement[]> {
   return []
 }
 
+export async function triggerPayout(walletId: string, amount: number): Promise<any> {
+  const res = await apiClient.post(`${API_ENDPOINTS.SETTLEMENTS.WALLETS}/${walletId}/payout`, { amount })
+  if (!res.success) throw new Error(res.error?.message || 'Failed to trigger payout')
+  return res.data!
+}
+
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 export interface AdminNotification {

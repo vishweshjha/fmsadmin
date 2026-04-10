@@ -459,11 +459,10 @@ export default function ServiceProviderManagement() {
       {/* Toast */}
       {toast && (
         <div
-          className={`fixed top-4 right-4 z-[100] px-5 py-3 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2 transition-all ${
-            toast.type === 'success'
+          className={`fixed top-4 right-4 z-[100] px-5 py-3 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2 transition-all ${toast.type === 'success'
               ? 'bg-green-600 text-white'
               : 'bg-red-600 text-white'
-          }`}
+            }`}
         >
           {toast.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
           {toast.msg}
@@ -719,13 +718,13 @@ export default function ServiceProviderManagement() {
           initial={
             modal === 'edit' && editTarget
               ? {
-                  user_id: editTarget.user_id,
-                  name: editTarget.name,
-                  phoneNumber: editTarget.phoneNumber,
-                  city: editTarget.city ?? '',
-                  yearsOfExperience: editTarget.yearsOfExperience ?? 0,
-                  status: editTarget.status ?? 'PENDING',
-                }
+                user_id: editTarget.user_id,
+                name: editTarget.name,
+                phoneNumber: editTarget.phoneNumber,
+                city: editTarget.city ?? '',
+                yearsOfExperience: editTarget.yearsOfExperience ?? 0,
+                status: editTarget.status ?? 'PENDING',
+              }
               : emptyForm()
           }
           onSave={handleSave}

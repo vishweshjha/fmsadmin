@@ -9,9 +9,12 @@ import {
   AlertCircle,
   ChevronDown,
   FileSpreadsheet,
+  IndianRupee,
+  ShieldCheck,
+  X,
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { fetchWallets, fetchSettlements, type Wallet, type Settlement } from '../services/gyorsApi'
+import { fetchWallets, fetchSettlements, triggerPayout, type Wallet, type Settlement } from '../services/gyorsApi'
 import { exportToCSV, exportToPDF, formatAmountPlain } from '../utils/exportUtils'
 
 const revenueData = [
@@ -83,6 +86,13 @@ export default function SettlementsFinance() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Payout states
+  const [payoutWallet, setPayoutWallet] = useState<Wallet | null>(null)
+  const [payoutAmount, setPayoutAmount] = useState<string>('')
+  const [payoutLoading, setPayoutLoading] = useState(false)
+  const [payoutError, setPayoutError] = useState<string | null>(null)
+  const [payoutSuccess, setPayoutSuccess] = useState<string | null>(null)
+
   const loadData = async () => {
     setLoading(true)
     setError(null)
@@ -98,6 +108,40 @@ export default function SettlementsFinance() {
   }
 
   useEffect(() => { loadData() }, [])
+
+  const handleTriggerPayout = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!payoutWallet) return
+    
+    const amt = parseFloat(payoutAmount)
+    if (isNaN(amt) || amt <= 0) {
+      setPayoutError('Please enter a valid amount')
+      return
+    }
+    if (amt > (payoutWallet.balance || 0)) {
+      setPayoutError(`Cannot exceed wallet balance of ${formatAmountPlain(payoutWallet.balance || 0)}`)
+      return
+    }
+
+    setPayoutLoading(true)
+    setPayoutError(null)
+    setPayoutSuccess(null)
+    try {
+      await triggerPayout(payoutWallet.id, amt)
+      setPayoutSuccess(`Successfully triggered payout of ${formatAmountPlain(amt)}`)
+      setPayoutAmount('')
+      // Reload data to reflect new balance and settlement
+      await loadData()
+      setTimeout(() => {
+        setPayoutWallet(null)
+        setPayoutSuccess(null)
+      }, 2000)
+    } catch (e) {
+      setPayoutError(e instanceof Error ? e.message : 'Failed to trigger payout')
+    } finally {
+      setPayoutLoading(false)
+    }
+  }
 
   const totalWalletBalance = wallets.reduce((sum, w) => sum + (w.balance || 0), 0)
   const formatAmount = (n: number) =>
@@ -334,7 +378,7 @@ export default function SettlementsFinance() {
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {wallet.currency || 'INR'}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="px-6 py-4 whitespace-nowrap flex items-center gap-3">
                                 <button
                                   title="Export this wallet"
                                   onClick={() =>
@@ -345,9 +389,21 @@ export default function SettlementsFinance() {
                                       [[wallet.id, wallet.userId ?? '', wallet.balance ?? 0, wallet.currency ?? 'INR']]
                                     )
                                   }
-                                  className="text-primary-600 hover:text-primary-900"
+                                  className="text-primary-600 hover:text-primary-900 bg-primary-50 p-1.5 rounded"
                                 >
                                   <FileText size={18} />
+                                </button>
+                                <button
+                                  title="Trigger Payout"
+                                  onClick={() => {
+                                    setPayoutWallet(wallet)
+                                    setPayoutAmount('')
+                                    setPayoutError(null)
+                                    setPayoutSuccess(null)
+                                  }}
+                                  className="text-green-600 hover:text-green-900 bg-green-50 p-1.5 rounded flex items-center gap-1 text-xs font-semibold"
+                                >
+                                  <DollarSign size={16} /> Pay
                                 </button>
                               </td>
                             </tr>
@@ -515,6 +571,75 @@ export default function SettlementsFinance() {
           )}
         </div>
       </div>
+
+      {/* Payout Modal */}
+      {payoutWallet && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
+            <div className="flex justify-between items-center p-4 border-b border-gray-200">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <ShieldCheck className="text-green-600" /> Trigger Admin Payout
+              </h3>
+              <button 
+                onClick={() => setPayoutWallet(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4 bg-gray-50 border-b border-gray-200">
+              <p className="text-sm text-gray-500">Wallet ID: <span className="font-mono text-gray-900">{payoutWallet.id}</span></p>
+              <p className="text-sm text-gray-500 mt-1">Available Balance: <span className="font-semibold text-green-700">{formatAmountPlain(payoutWallet.balance || 0)}</span></p>
+            </div>
+            
+            <form onSubmit={handleTriggerPayout} className="p-6 space-y-4">
+              {payoutSuccess && (
+                <div className="p-3 bg-green-50 text-green-800 rounded-lg text-sm mb-4">
+                  {payoutSuccess}
+                </div>
+              )}
+              {payoutError && (
+                <div className="p-3 bg-red-50 text-red-800 rounded-lg text-sm flex items-start gap-2 mb-4">
+                  <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                  {payoutError}
+                </div>
+              )}
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Payout Amount (₹)</label>
+                <div className="relative relative w-full">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <IndianRupee size={16} className="text-gray-500" />
+                  </div>
+                  <input
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    required
+                    value={payoutAmount}
+                    onChange={(e) => setPayoutAmount(e.target.value)}
+                    className="pl-9 w-full rounded-lg border border-gray-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="Enter amount to payout..."
+                  />
+                </div>
+                <p className="mt-1 text-xs text-gray-500 flex justify-between">
+                  <span>Enter an amount up to available balance</span>
+                  <button type="button" onClick={() => setPayoutAmount(String(payoutWallet.balance || 0))} className="text-primary-600 hover:underline">Max</button>
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={payoutLoading || !payoutAmount || (payoutWallet.balance || 0) <= 0}
+                className="w-full mt-4 bg-green-600 text-white rounded-lg py-2.5 font-semibold hover:bg-green-700 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+              >
+                {payoutLoading ? <Loader2 size={18} className="animate-spin" /> : <DollarSign size={18} />}
+                Confirm Payout
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
