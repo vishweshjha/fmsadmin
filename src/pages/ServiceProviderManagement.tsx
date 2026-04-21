@@ -170,6 +170,8 @@ function ProviderFormModal({
   onClose,
   saving,
   error,
+  allCategories,
+  allItems,
 }: {
   mode: 'add' | 'edit'
   initial: ServiceProviderPayload
