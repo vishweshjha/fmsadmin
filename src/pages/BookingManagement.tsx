@@ -35,8 +35,8 @@ export default function BookingManagement() {
     }
   }
 
-  useEffect(() => { 
-    loadBookings() 
+  useEffect(() => {
+    loadBookings()
     loadProviders()
   }, [])
 
@@ -44,6 +44,7 @@ export default function BookingManagement() {
     if (!providerId) return
     setActionLoading(bookingId)
     try {
+      console.warn(bookingId, providerId, "provider id ###############");
       await assignProviderToBooking(bookingId, providerId)
       await loadBookings() // Refresh bookings to show the assigned provider and updated status
     } catch (err) {
@@ -96,7 +97,7 @@ export default function BookingManagement() {
     const customerName = b.user?.name || b.userId || ''
     const providerName = b.provider?.name || b.providerId || ''
     const searchString = `${id} ${serviceName} ${customerName} ${providerName}`.toLowerCase()
-    
+
     const matchSearch = !searchTerm || searchString.includes(searchTerm.toLowerCase())
     const matchStatus = filterStatus === 'all' || b.status?.toLowerCase() === filterStatus.toLowerCase()
     return matchSearch && matchStatus
@@ -210,15 +211,15 @@ export default function BookingManagement() {
                         ? <div className="text-sm text-gray-900">{booking.provider?.name || booking.providerId}</div>
                         : (
                           <div className="flex flex-col gap-1">
-                            <select 
-                               onChange={(e) => handleAssignProvider(booking.id, e.target.value)}
-                               defaultValue=""
-                               className="text-xs border border-orange-300 text-orange-700 bg-orange-50 rounded-md py-1 px-2 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                            <select
+                              onChange={(e) => handleAssignProvider(booking.id, e.target.value)}
+                              defaultValue=""
+                              className="text-xs border border-orange-300 text-orange-700 bg-orange-50 rounded-md py-1 px-2 focus:outline-none focus:ring-1 focus:ring-orange-500"
                             >
-                               <option value="" disabled>Assign Provider ▼</option>
-                               {providers.map(p => (
-                                 <option key={p.id} value={p.id}>{p.name} ({p.city || 'Any'})</option>
-                               ))}
+                              <option value="" disabled>Assign Provider ▼</option>
+                              {providers.map(p => (
+                                <option key={p.id} value={p.id}>{p.name} ({p.city || 'Any'})</option>
+                              ))}
                             </select>
                           </div>
                         )}

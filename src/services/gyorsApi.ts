@@ -337,6 +337,8 @@ export interface ServiceProvider {
   updatedAt?: string
   user?: { id: string; name?: string; email?: string; phoneNumber?: string }
   providerProfiles?: { id: string; services: string[]; experiences: string[] }[]
+  categories?: { id: string; name: string }[]
+  items?: { id: string; name: string }[]
   [key: string]: any
 }
 
@@ -347,6 +349,8 @@ export interface ServiceProviderPayload {
   city?: string
   yearsOfExperience?: number
   status?: string
+  categoryIds?: string[]
+  itemIds?: string[]
 }
 
 export interface ServiceProviderListParams {
@@ -396,4 +400,18 @@ export async function updateServiceProviderStatus(id: string, status: string): P
 export async function deleteServiceProvider(id: string): Promise<void> {
   const res = await apiClient.delete(API_ENDPOINTS.SERVICE_PROVIDERS.DELETE(id))
   if (!res.success) throw new Error(res.error?.message || 'Failed to delete service provider')
+}
+
+// ─── Categories & Items ───────────────────────────────────────────────────
+
+export async function fetchCategories(): Promise<{ id: string; name: string }[]> {
+  const res = await apiClient.get<any>('/services/categories')
+  if (!res.success) throw new Error(res.error?.message || 'Failed to load categories')
+  return res.data || []
+}
+
+export async function fetchServiceItems(): Promise<{ id: string; name: string; categoryId: string }[]> {
+  const res = await apiClient.get<any>('/services/items')
+  if (!res.success) throw new Error(res.error?.message || 'Failed to load service items')
+  return res.data || []
 }

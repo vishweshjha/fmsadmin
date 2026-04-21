@@ -24,6 +24,8 @@ import {
   updateServiceProvider,
   updateServiceProviderStatus,
   deleteServiceProvider,
+  fetchCategories,
+  fetchServiceItems,
   type ServiceProvider,
   type ServiceProviderPayload,
 } from '../services/gyorsApi'
@@ -59,6 +61,8 @@ const emptyForm = (): ServiceProviderPayload => ({
   city: '',
   yearsOfExperience: 0,
   status: 'PENDING',
+  categoryIds: [],
+  itemIds: [],
 })
 
 // ─── Status Dropdown (reusable) ───────────────────────────────────────────────
@@ -173,15 +177,31 @@ function ProviderFormModal({
   onClose: () => void
   saving: boolean
   error: string | null
+  allCategories: { id: string; name: string }[]
+  allItems: { id: string; name: string; categoryId: string }[]
 }) {
   const [form, setForm] = useState<ServiceProviderPayload>(initial)
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(initial.categoryIds || [])
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>(initial.itemIds || [])
 
   const set = (key: keyof ServiceProviderPayload, value: any) =>
     setForm((f) => ({ ...f, [key]: value }))
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave(form)
+    onSave({ ...form, categoryIds: selectedCategoryIds, itemIds: selectedItemIds })
+  }
+
+  const toggleCategory = (id: string) => {
+    setSelectedCategoryIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    )
+  }
+
+  const toggleItem = (id: string) => {
+    setSelectedItemIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    )
   }
 
   const inputCls =
@@ -302,6 +322,62 @@ function ProviderFormModal({
             </select>
           </div>
 
+          <div className="border-t border-gray-100 pt-4 mt-6">
+            <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-primary-600" />
+              Service Mapping
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  Mapped Categories
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {allCategories.map(cat => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => toggleCategory(cat.id)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                        selectedCategoryIds.includes(cat.id)
+                          ? 'bg-primary-600 text-white shadow-md shadow-primary-200'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  Specific Items
+                </label>
+                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1 border border-gray-50 rounded-lg">
+                  {allItems.map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => toggleItem(item.id)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs transition-all ${
+                        selectedItemIds.includes(item.id)
+                          ? 'bg-primary-50 text-primary-700 border border-primary-200 font-semibold'
+                          : 'bg-white border border-gray-200 text-gray-600 hover:border-primary-300'
+                      }`}
+                    >
+                      <div className={`w-3 h-3 rounded-full border ${
+                        selectedItemIds.includes(item.id) ? 'bg-primary-600 border-primary-600' : 'border-gray-300'
+                      }`} />
+                      <span className="truncate">{item.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Footer */}
           <div className="flex justify-end gap-3 pt-2">
             <button
@@ -348,6 +424,10 @@ export default function ServiceProviderManagement() {
   const [deleteTarget, setDeleteTarget] = useState<ServiceProvider | null>(null)
   const [deleting, setDeleting] = useState(false)
 
+  // Master Data
+  const [allCategories, setAllCategories] = useState<{ id: string; name: string }[]>([])
+  const [allItems, setAllItems] = useState<{ id: string; name: string; categoryId: string }[]>([])
+
   // Status change loading map
   const [statusLoading, setStatusLoading] = useState<Record<string, boolean>>({})
 
@@ -376,7 +456,20 @@ export default function ServiceProviderManagement() {
     }
   }
 
-  useEffect(() => { loadProviders() }, [])
+  const loadMasterData = async () => {
+    try {
+      const [cats, items] = await Promise.all([fetchCategories(), fetchServiceItems()])
+      setAllCategories(cats)
+      setAllItems(items)
+    } catch (e) {
+      console.error('Failed to load metadata:', e)
+    }
+  }
+
+  useEffect(() => { 
+    loadProviders()
+    loadMasterData()
+  }, [])
 
   // ─── CRUD Actions ──────────────────────────────────────────────────────────
 
@@ -724,6 +817,8 @@ export default function ServiceProviderManagement() {
                 city: editTarget.city ?? '',
                 yearsOfExperience: editTarget.yearsOfExperience ?? 0,
                 status: editTarget.status ?? 'PENDING',
+                categoryIds: editTarget.categories?.map((c: any) => c.id) || [],
+                itemIds: editTarget.items?.map((i: any) => i.id) || [],
               }
               : emptyForm()
           }
@@ -731,6 +826,8 @@ export default function ServiceProviderManagement() {
           onClose={() => { setModal(null); setEditTarget(null) }}
           saving={saving}
           error={formError}
+          allCategories={allCategories}
+          allItems={allItems}
         />
       )}
 
