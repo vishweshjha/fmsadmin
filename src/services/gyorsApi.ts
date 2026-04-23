@@ -407,11 +407,19 @@ export async function deleteServiceProvider(id: string): Promise<void> {
 export async function fetchCategories(): Promise<{ id: string; name: string }[]> {
   const res = await apiClient.get<any>('/services/categories')
   if (!res.success) throw new Error(res.error?.message || 'Failed to load categories')
-  return res.data || []
+  const data = res.data
+  if (Array.isArray(data)) return data
+  if (data?.categories) return data.categories
+  if (data?.data && Array.isArray(data.data)) return data.data
+  return []
 }
 
 export async function fetchServiceItems(): Promise<{ id: string; name: string; categoryId: string }[]> {
   const res = await apiClient.get<any>('/services/items')
   if (!res.success) throw new Error(res.error?.message || 'Failed to load service items')
-  return res.data || []
+  const data = res.data
+  if (Array.isArray(data)) return data
+  if (data?.items) return data.items
+  if (data?.data && Array.isArray(data.data)) return data.data
+  return []
 }

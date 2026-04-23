@@ -336,7 +336,7 @@ function ProviderFormModal({
                   Mapped Categories
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {allCategories.map(cat => (
+                  {(Array.isArray(allCategories) ? allCategories : []).map(cat => (
                     <button
                       key={cat.id}
                       type="button"
@@ -358,7 +358,7 @@ function ProviderFormModal({
                   Specific Items
                 </label>
                 <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1 border border-gray-50 rounded-lg">
-                  {allItems.map(item => (
+                  {(Array.isArray(allItems) ? allItems : []).map(item => (
                     <button
                       key={item.id}
                       type="button"
