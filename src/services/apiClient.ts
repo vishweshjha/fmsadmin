@@ -42,6 +42,13 @@ class ApiClient {
     return headers
   }
 
+  private getFullUrl(url: string): string {
+    if (url.startsWith('http')) return url
+    const base = this.baseURL.endsWith('/') ? this.baseURL.slice(0, -1) : this.baseURL
+    const path = url.startsWith('/') ? url : `/${url}`
+    return `${base}${path}`
+  }
+
   private async handleResponse<T>(response: Response): Promise<{ success: boolean; data?: T; error?: any; pagination?: any; message?: string }> {
     let data: any
     const contentType = response.headers.get('content-type')
@@ -79,7 +86,7 @@ class ApiClient {
 
   async get<T>(url: string, params?: Record<string, any>): Promise<{ success: boolean; data?: T; error?: any; pagination?: any }> {
     try {
-      let fullUrl = url
+      let fullUrl = this.getFullUrl(url)
       if (params) {
         const queryString = new URLSearchParams(
           Object.entries(params).reduce((acc, [key, value]) => {
@@ -114,7 +121,7 @@ class ApiClient {
 
   async post<T>(url: string, data?: any): Promise<{ success: boolean; data?: T; error?: any }> {
     try {
-      const response = await fetch(url, {
+      const response = await fetch(this.getFullUrl(url), {
         method: 'POST',
         headers: this.getHeaders(),
         body: data ? JSON.stringify(data) : undefined,
@@ -135,7 +142,7 @@ class ApiClient {
 
   async patch<T>(url: string, data?: any): Promise<{ success: boolean; data?: T; error?: any }> {
     try {
-      const response = await fetch(url, {
+      const response = await fetch(this.getFullUrl(url), {
         method: 'PATCH',
         headers: this.getHeaders(),
         body: data ? JSON.stringify(data) : undefined,
@@ -156,7 +163,7 @@ class ApiClient {
 
   async put<T>(url: string, data?: any): Promise<{ success: boolean; data?: T; error?: any }> {
     try {
-      const response = await fetch(url, {
+      const response = await fetch(this.getFullUrl(url), {
         method: 'PUT',
         headers: this.getHeaders(),
         body: data ? JSON.stringify(data) : undefined,
@@ -177,7 +184,7 @@ class ApiClient {
 
   async delete<T>(url: string): Promise<{ success: boolean; data?: T; error?: any }> {
     try {
-      const response = await fetch(url, {
+      const response = await fetch(this.getFullUrl(url), {
         method: 'DELETE',
         headers: this.getHeaders(),
       })

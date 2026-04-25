@@ -405,21 +405,33 @@ export async function deleteServiceProvider(id: string): Promise<void> {
 // ─── Categories & Items ───────────────────────────────────────────────────
 
 export async function fetchCategories(): Promise<{ id: string; name: string }[]> {
-  const res = await apiClient.get<any>('/services/categories')
-  if (!res.success) throw new Error(res.error?.message || 'Failed to load categories')
-  const data = res.data
-  if (Array.isArray(data)) return data
-  if (data?.categories) return data.categories
-  if (data?.data && Array.isArray(data.data)) return data.data
-  return []
+  try {
+    const res = await apiClient.get<any>(API_ENDPOINTS.COMMON.SERVICE_CATEGORIES)
+    if (!res.success) return []
+    
+    const data = res.data
+    if (Array.isArray(data)) return data
+    if (data?.categories && Array.isArray(data.categories)) return data.categories
+    if (data?.data && Array.isArray(data.data)) return data.data
+    return []
+  } catch (e) {
+    console.error('fetchCategories failed:', e)
+    return []
+  }
 }
 
 export async function fetchServiceItems(): Promise<{ id: string; name: string; categoryId: string }[]> {
-  const res = await apiClient.get<any>('/services/items')
-  if (!res.success) throw new Error(res.error?.message || 'Failed to load service items')
-  const data = res.data
-  if (Array.isArray(data)) return data
-  if (data?.items) return data.items
-  if (data?.data && Array.isArray(data.data)) return data.data
-  return []
+  try {
+    const res = await apiClient.get<any>(API_ENDPOINTS.COMMON.SERVICE_ITEMS)
+    if (!res.success) return []
+    
+    const data = res.data
+    if (Array.isArray(data)) return data
+    if (data?.items && Array.isArray(data.items)) return data.items
+    if (data?.data && Array.isArray(data.data)) return data.data
+    return []
+  } catch (e) {
+    console.error('fetchServiceItems failed:', e)
+    return []
+  }
 }

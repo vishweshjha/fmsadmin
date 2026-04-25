@@ -83,6 +83,7 @@ export const API_ENDPOINTS = {
   COMMON: {
     HEALTH_CHECK: `${BASE_URL}/health`,
     SERVICE_CATEGORIES: `${BASE_URL}/services/categories`,
+    SERVICE_ITEMS: `${BASE_URL}/services/items`,
     SERVICE_SEARCH: `${BASE_URL}/services/search`,
   },
 
