@@ -15,19 +15,21 @@ import SettlementsFinance from './pages/SettlementsFinance'
 import AnalyticsReporting from './pages/AnalyticsReporting'
 import AuditLogging from './pages/AuditLogging'
 import ServiceProviderManagement from './pages/ServiceProviderManagement'
+import ServiceManagement from './pages/ServiceManagement'
 import { UserRole } from './context/AuthContext'
 
 // Role-based route permissions
 const rolePermissions: Record<string, UserRole[]> = {
   '/': ['Super Admin', 'Operations Admin', 'Finance Admin', 'Support Agent', 'Compliance Officer'],
   '/users': ['Super Admin', 'Operations Admin'],
+  '/providers': ['Super Admin', 'Operations Admin'],
+  '/services': ['Super Admin', 'Operations Admin'],
   '/kyc': ['Super Admin', 'Compliance Officer'],
   '/bookings': ['Super Admin', 'Operations Admin', 'Support Agent'],
   '/pricing': ['Super Admin', 'Finance Admin'],
   '/settlements': ['Super Admin', 'Finance Admin'],
   '/analytics': ['Super Admin', 'Operations Admin', 'Finance Admin'],
   '/audit': ['Super Admin', 'Compliance Officer'],
-  '/providers': ['Super Admin', 'Operations Admin'],
 }
 
 function AppRoutes() {
@@ -137,6 +139,16 @@ function AppRoutes() {
           <ProtectedRoute requiredRoles={rolePermissions['/providers']}>
             <Layout>
               <ServiceProviderManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/services"
+        element={
+          <ProtectedRoute requiredRoles={rolePermissions['/services']}>
+            <Layout>
+              <ServiceManagement />
             </Layout>
           </ProtectedRoute>
         }
