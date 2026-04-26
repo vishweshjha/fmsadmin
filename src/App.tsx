@@ -21,9 +21,9 @@ import { UserRole } from './context/AuthContext'
 // Role-based route permissions
 const rolePermissions: Record<string, UserRole[]> = {
   '/': ['Super Admin', 'Operations Admin', 'Finance Admin', 'Support Agent', 'Compliance Officer'],
-  '/users': ['Super Admin', 'Operations Admin'],
-  '/providers': ['Super Admin', 'Operations Admin'],
-  '/services': ['Super Admin', 'Operations Admin'],
+  '/users': ['Super Admin', 'Operations Admin', 'Admin'],
+  '/providers': ['Super Admin', 'Operations Admin', 'Admin'],
+  '/services': ['Super Admin', 'Operations Admin', 'Admin'],
   '/kyc': ['Super Admin', 'Compliance Officer'],
   '/bookings': ['Super Admin', 'Operations Admin', 'Support Agent'],
   '/pricing': ['Super Admin', 'Finance Admin'],

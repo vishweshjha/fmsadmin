@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { apiClient } from '../services/apiClient'
 
-export type UserRole = 'Super Admin' | 'Operations Admin' | 'Finance Admin' | 'Support Agent' | 'Compliance Officer'
+export type UserRole = 'Super Admin' | 'Operations Admin' | 'Finance Admin' | 'Support Agent' | 'Compliance Officer' | 'Admin'
 
 export interface User {
   id: string
@@ -79,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         'FINANCE_ADMIN': 'Finance Admin',
         'SUPPORT_AGENT': 'Support Agent',
         'COMPLIANCE_OFFICER': 'Compliance Officer',
+        'ADMIN': 'Admin',
       }
 
       const rawUser = data.user || data
