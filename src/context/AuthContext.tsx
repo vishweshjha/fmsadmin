@@ -116,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         'Finance Admin': 'FINANCE_ADMIN',
         'Support Agent': 'SUPPORT_AGENT',
         'Compliance Officer': 'COMPLIANCE_OFFICER',
+        'Admin': 'ADMIN',
       }
 
       const response = await fetch(ADMIN_AUTH_SIGNUP, {
