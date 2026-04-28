@@ -104,6 +104,27 @@ test.describe('Navigation', () => {
     await expect(page).toHaveURL('/')
   })
 
+  test('should navigate to Service Providers', async ({ page }) => {
+    const dashboardPage = new DashboardPage(page)
+    await dashboardPage.navigateToMenuItem('Service Providers')
+    await expect(page).toHaveURL('/providers')
+    await expect(page.locator('h1:has-text("Service Provider Management")')).toBeVisible()
+  })
+
+  test('should navigate to Service Catalog', async ({ page }) => {
+    const dashboardPage = new DashboardPage(page)
+    await dashboardPage.navigateToMenuItem('Service Catalog')
+    await expect(page).toHaveURL('/services')
+    await expect(page.locator('h1:has-text("Service Management")')).toBeVisible()
+  })
+
+  test('should navigate to Coupons', async ({ page }) => {
+    const dashboardPage = new DashboardPage(page)
+    await dashboardPage.navigateToMenuItem('Coupons')
+    await expect(page).toHaveURL('/coupons')
+    await expect(page.locator('h1:has-text("Coupon Management")')).toBeVisible()
+  })
+
   test('should maintain sidebar visibility on navigation', async ({ page }) => {
     const dashboardPage = new DashboardPage(page)
     
@@ -111,7 +132,7 @@ test.describe('Navigation', () => {
     await dashboardPage.navigateToMenuItem('User Management')
     await expect(page.locator('nav')).toBeVisible()
     
-    await dashboardPage.navigateToMenuItem('Bookings')
+    await dashboardPage.navigateToMenuItem('Booking Management')
     await expect(page.locator('nav')).toBeVisible()
     
     await dashboardPage.navigateToMenuItem('Dashboard')

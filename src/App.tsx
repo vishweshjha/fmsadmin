@@ -16,6 +16,7 @@ import AnalyticsReporting from './pages/AnalyticsReporting'
 import AuditLogging from './pages/AuditLogging'
 import ServiceProviderManagement from './pages/ServiceProviderManagement'
 import ServiceManagement from './pages/ServiceManagement'
+import CouponManagement from './pages/CouponManagement'
 import { UserRole } from './context/AuthContext'
 
 // Role-based route permissions
@@ -29,6 +30,7 @@ const rolePermissions: Record<string, UserRole[]> = {
   '/pricing': ['Super Admin', 'Finance Admin'],
   '/settlements': ['Super Admin', 'Finance Admin'],
   '/analytics': ['Super Admin', 'Operations Admin', 'Finance Admin'],
+  '/coupons': ['Super Admin', 'Operations Admin', 'Admin'],
   '/audit': ['Super Admin', 'Compliance Officer'],
 }
 
@@ -149,6 +151,16 @@ function AppRoutes() {
           <ProtectedRoute requiredRoles={rolePermissions['/services']}>
             <Layout>
               <ServiceManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/coupons"
+        element={
+          <ProtectedRoute requiredRoles={rolePermissions['/coupons']}>
+            <Layout>
+              <CouponManagement />
             </Layout>
           </ProtectedRoute>
         }

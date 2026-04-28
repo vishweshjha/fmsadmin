@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  Edit2, 
-  Trash2, 
-  CheckCircle, 
+import {
+  Plus,
+  Search,
+  Filter,
+  MoreVertical,
+  Edit2,
+  Trash2,
+  CheckCircle,
   XCircle,
   Loader2,
   Briefcase,
@@ -40,19 +40,19 @@ export default function ServiceManagement() {
   const [serviceItems, setServiceItems] = useState<ServiceItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'categories' | 'items'>('categories')
-  
+
   // Modal states
   const [showCategoryModal, setShowCategoryModal] = useState(false)
   const [showItemModal, setShowItemModal] = useState(false)
-  
+
   // Form states
   const [newCategory, setNewCategory] = useState({ name: '', icon: 'briefcase', active: true })
-  const [newItem, setNewItem] = useState({ 
-    name: '', 
-    description: '', 
-    price: '', 
-    categoryId: '', 
-    durationMinutes: 60 
+  const [newItem, setNewItem] = useState({
+    name: '',
+    description: '',
+    price: '',
+    categoryId: '',
+    durationMinutes: 60
   })
 
   useEffect(() => {
@@ -117,14 +117,14 @@ export default function ServiceManagement() {
           <p className="text-gray-500">Manage your service categories and individual offerings</p>
         </div>
         <div className="flex gap-3">
-          <button 
+          <button
             onClick={() => setShowCategoryModal(true)}
             className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <Plus size={20} />
             Add Category
           </button>
-          <button 
+          <button
             onClick={() => setShowItemModal(true)}
             className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
           >
@@ -139,21 +139,19 @@ export default function ServiceManagement() {
         <nav className="-mb-px flex space-x-8">
           <button
             onClick={() => setActiveTab('categories')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'categories'
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'categories'
                 ? 'border-black text-black'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
+              }`}
           >
             Categories ({categories.length})
           </button>
           <button
             onClick={() => setActiveTab('items')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'items'
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'items'
                 ? 'border-black text-black'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
+              }`}
           >
             Service Items ({serviceItems.length})
           </button>
@@ -185,9 +183,8 @@ export default function ServiceManagement() {
                     <span className="text-sm text-gray-500">{cat.icon}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      cat.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                    }`}>
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${cat.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
                       {cat.active ? <CheckCircle size={12} /> : <XCircle size={12} />}
                       {cat.active ? 'Active' : 'Inactive'}
                     </span>

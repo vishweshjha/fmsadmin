@@ -13,6 +13,8 @@ test.describe('Role-Based Access Control', () => {
     const menuItems = [
       'Dashboard',
       'User Management',
+      'Service Providers',
+      'Service Catalog',
       'KYC & Verification',
       'Booking Management',
       'Pricing & Commission',
@@ -34,6 +36,8 @@ test.describe('Role-Based Access Control', () => {
     // Should see
     await expect(page.locator('text=Dashboard')).toBeVisible()
     await expect(page.locator('text=User Management')).toBeVisible()
+    await expect(page.locator('text=Service Providers')).toBeVisible()
+    await expect(page.locator('text=Service Catalog')).toBeVisible()
     await expect(page.locator('text=Booking Management')).toBeVisible()
     await expect(page.locator('text=Analytics & Reporting')).toBeVisible()
     

@@ -96,6 +96,13 @@ export const API_ENDPOINTS = {
     UPDATE_STATUS: (id: string) => `${BASE_URL}/admin/service-providers/${id}/status`,
     DELETE: (id: string) => `${BASE_URL}/admin/service-providers/${id}`,
   },
+
+  // Admin - Coupons
+  COUPONS: {
+    CREATE: `${BASE_URL}/admin/coupons`,
+    LIST: `${BASE_URL}/admin/coupons`,
+    DELETE: (id: string) => `${BASE_URL}/admin/coupons/${id}`,
+  },
 } as const
 
 export default API_ENDPOINTS

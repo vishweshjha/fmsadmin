@@ -22,9 +22,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Admin auth always goes to the LOCAL fmsadmin backend (not the Gyors GCP backend)
-// The local backend uses global prefix /api and runs on port 3000
-export const LOCAL_ADMIN_API = 'https://gyors-backend-311476989793.us-central1.run.app/api'
+// Admin auth always goes to the admin backend
+export const LOCAL_ADMIN_API = import.meta.env.VITE_API_URL || 'https://gyors-backend-311476989793.us-central1.run.app/api'
 export const ADMIN_AUTH_LOGIN = `${LOCAL_ADMIN_API}/auth/admin/login`
 export const ADMIN_AUTH_SIGNUP = `${LOCAL_ADMIN_API}/auth/admin/signup`
 export const ADMIN_AUTH_FORGOT = `${LOCAL_ADMIN_API}/auth/admin/forgot-password`

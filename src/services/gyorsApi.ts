@@ -435,3 +435,36 @@ export async function fetchServiceItems(): Promise<{ id: string; name: string; c
     return []
   }
 }
+// ─── Coupons ──────────────────────────────────────────────────────────────────
+export interface Coupon {
+  id?: string
+  code: string
+  discountPercent: number
+  maxDiscount?: number
+  expiryDate: string
+  isActive?: boolean
+  usageLimit?: number
+  usedCount?: number
+  createdAt?: string
+}
+
+export async function fetchCoupons(): Promise<Coupon[]> {
+  const res = await apiClient.get<any>(API_ENDPOINTS.COUPONS.LIST)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to load coupons')
+  const data = res.data
+  if (Array.isArray(data)) return data
+  if (data?.data) return data.data
+  return []
+}
+
+export async function createCoupon(data: Coupon): Promise<any> {
+  const res = await apiClient.post(API_ENDPOINTS.COUPONS.CREATE, data)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to create coupon')
+  return res.data
+}
+
+export async function deleteCoupon(id: string): Promise<any> {
+  const res = await apiClient.delete(API_ENDPOINTS.COUPONS.DELETE(id))
+  if (!res.success) throw new Error(res.error?.message || 'Failed to delete coupon')
+  return res.data
+}

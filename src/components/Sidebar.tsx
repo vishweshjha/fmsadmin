@@ -10,7 +10,8 @@ import {
   TrendingUp,
   Shield,
   LogOut,
-  Briefcase
+  Briefcase,
+  Tag
 } from 'lucide-react'
 import { useAuth, UserRole } from '../context/AuthContext'
 
@@ -31,6 +32,7 @@ const menuItems: MenuItem[] = [
   { path: '/pricing', icon: DollarSign, label: 'Pricing & Commission', requiredRoles: ['Super Admin', 'Finance Admin'] },
   { path: '/settlements', icon: TrendingUp, label: 'Settlements & Finance', requiredRoles: ['Super Admin', 'Finance Admin'] },
   { path: '/analytics', icon: Clock, label: 'Analytics & Reporting', requiredRoles: ['Super Admin', 'Operations Admin', 'Finance Admin'] },
+  { path: '/coupons', icon: Tag, label: 'Coupons', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },
   { path: '/audit', icon: Shield, label: 'Audit & Logging', requiredRoles: ['Super Admin', 'Compliance Officer'] },
 ]
 
