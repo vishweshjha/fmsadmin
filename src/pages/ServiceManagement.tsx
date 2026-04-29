@@ -9,8 +9,6 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
-  Briefcase,
-  List
 } from 'lucide-react'
 import apiClient from '../services/apiClient'
 
