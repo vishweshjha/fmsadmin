@@ -49,8 +49,9 @@ export default function CouponManagement() {
       setIsModalOpen(false)
       setFormData({ code: '', discountPercent: '', maxDiscount: '', expiryDate: '', usageLimit: '' })
       await loadCoupons()
-    } catch (error) {
-      alert('Failed to create coupon')
+      alert('Coupon created successfully!')
+    } catch (error: any) {
+      alert(error.message || 'Failed to create coupon')
     } finally {
       setIsSubmitting(false)
     }

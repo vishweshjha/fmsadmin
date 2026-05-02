@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import {
   Plus,
-  Search,
-  Filter,
   MoreVertical,
-  Edit2,
-  Trash2,
   CheckCircle,
   XCircle,
   Loader2,
@@ -138,8 +134,8 @@ export default function ServiceManagement() {
           <button
             onClick={() => setActiveTab('categories')}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'categories'
-                ? 'border-black text-black'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-black text-black'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
           >
             Categories ({categories.length})
@@ -147,8 +143,8 @@ export default function ServiceManagement() {
           <button
             onClick={() => setActiveTab('items')}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'items'
-                ? 'border-black text-black'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-black text-black'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
           >
             Service Items ({serviceItems.length})
