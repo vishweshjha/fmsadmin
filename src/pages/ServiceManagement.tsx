@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import {
   Plus,
+  Search,
+  Filter,
   MoreVertical,
+  Edit2,
+  Trash2,
   CheckCircle,
   XCircle,
   Loader2,
