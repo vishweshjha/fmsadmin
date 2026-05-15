@@ -1,0 +1,23 @@
+{
+  "installationFolder": "c:\\manpower-fms-mobile\\fmsadmin\\b\\react-native-reanimated\\intermediates\\prefab_package\\debug\\prefab",
+  "gradlePath": ":react-native-reanimated",
+  "packageInfo": {
+    "packageName": "react-native-reanimated",
+    "packageSchemaVersion": 2,
+    "packageDependencies": [],
+    "modules": [
+      {
+        "moduleName": "reanimated",
+        "moduleHeaders": "c:\\manpower-fms-mobile\\fmsadmin\\b\\react-native-reanimated\\prefab-headers\\reanimated",
+        "moduleExportLibraries": [],
+        "abis": []
+      },
+      {
+        "moduleName": "worklets",
+        "moduleHeaders": "c:\\manpower-fms-mobile\\fmsadmin\\b\\react-native-reanimated\\prefab-headers\\worklets",
+        "moduleExportLibraries": [],
+        "abis": []
+      }
+    ]
+  }
+}

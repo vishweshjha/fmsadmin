@@ -26,6 +26,7 @@ import {
   deleteServiceProvider,
   fetchCategories,
   fetchServiceItems,
+  fetchBookings,
   type ServiceProvider,
   type ServiceProviderPayload,
 } from '../services/gyorsApi'
@@ -404,7 +405,101 @@ function ProviderFormModal({
   )
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Provider Details Modal ───────────────────────────────────────────────────
+
+function ProviderDetailsModal({
+  provider,
+  onClose,
+}: {
+  provider: ServiceProvider
+  onClose: () => void
+}) {
+  const [jobs, setJobs] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadJobs = async () => {
+      try {
+        const allBookings = await fetchBookings()
+        setJobs(allBookings.filter((b: any) => b.providerId === provider.id))
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadJobs()
+  }, [provider.id])
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center font-bold text-blue-700">
+              {provider.name.charAt(0)}
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">{provider.name}</h3>
+              <p className="text-sm text-gray-500">Provider Details & History</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Average Rating</p>
+              <div className="flex items-center gap-2 mt-1">
+                <Star size={20} className="text-yellow-400 fill-yellow-400" />
+                <span className="text-2xl font-bold">{provider.rating ?? 'N/A'}</span>
+              </div>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Completed Jobs</p>
+              <p className="text-2xl font-bold mt-1">{jobs.filter(j => j.status === 'COMPLETED').length}</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Experience</p>
+              <p className="text-2xl font-bold mt-1">{provider.yearsOfExperience} Years</p>
+            </div>
+          </div>
+
+          <h4 className="font-bold text-gray-900 mb-4">Job History</h4>
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="animate-spin text-primary-600" />
+            </div>
+          ) : jobs.length === 0 ? (
+            <p className="text-center py-8 text-gray-500">No job history found.</p>
+          ) : (
+            <div className="space-y-3">
+              {jobs.map((job) => (
+                <div key={job.id} className="border border-gray-100 rounded-lg p-4 flex justify-between items-center">
+                  <div>
+                    <p className="font-semibold text-sm">{job.serviceName}</p>
+                    <p className="text-xs text-gray-500">{new Date(job.createdAt).toLocaleDateString()}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-sm text-green-700">₹{job.amount || job.finalPrice}</p>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                      job.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {job.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function ServiceProviderManagement() {
   const [providers, setProviders] = useState<ServiceProvider[]>([])
@@ -419,6 +514,7 @@ export default function ServiceProviderManagement() {
   // Modal state
   const [modal, setModal] = useState<null | 'add' | 'edit'>(null)
   const [editTarget, setEditTarget] = useState<ServiceProvider | null>(null)
+  const [detailsTarget, setDetailsTarget] = useState<ServiceProvider | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -778,6 +874,13 @@ export default function ServiceProviderManagement() {
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2">
                           <button
+                            title="View details"
+                            onClick={() => setDetailsTarget(provider)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          >
+                            <RefreshCw size={16} />
+                          </button>
+                          <button
                             title="Edit provider"
                             onClick={() => {
                               setEditTarget(provider)
@@ -840,6 +943,14 @@ export default function ServiceProviderManagement() {
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
           loading={deleting}
+        />
+      )}
+
+      {/* Details Modal */}
+      {detailsTarget && (
+        <ProviderDetailsModal
+          provider={detailsTarget}
+          onClose={() => setDetailsTarget(null)}
         />
       )}
     </div>
