@@ -446,6 +446,11 @@ export interface Coupon {
   usageLimit?: number
   usedCount?: number
   createdAt?: string
+  isVisibleOnHome?: boolean
+  price?: number
+  allowedJobsCount?: number
+  jobDurationMinutes?: number
+  description?: string
 }
 
 export async function fetchCoupons(): Promise<Coupon[]> {

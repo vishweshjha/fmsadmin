@@ -13,7 +13,12 @@ export default function CouponManagement() {
     discountPercent: '',
     maxDiscount: '',
     expiryDate: '',
-    usageLimit: ''
+    usageLimit: '',
+    isVisibleOnHome: false,
+    price: '',
+    allowedJobsCount: '',
+    jobDurationMinutes: '60',
+    description: ''
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -43,11 +48,27 @@ export default function CouponManagement() {
         maxDiscount: formData.maxDiscount ? Number(formData.maxDiscount) : undefined,
         expiryDate: formData.expiryDate,
         usageLimit: formData.usageLimit ? Number(formData.usageLimit) : 0,
-        isActive: true
+        isActive: true,
+        isVisibleOnHome: formData.isVisibleOnHome,
+        price: formData.price ? Number(formData.price) : undefined,
+        allowedJobsCount: formData.allowedJobsCount ? Number(formData.allowedJobsCount) : undefined,
+        jobDurationMinutes: formData.jobDurationMinutes ? Number(formData.jobDurationMinutes) : undefined,
+        description: formData.description
       }
       await createCoupon(payload)
       setIsModalOpen(false)
-      setFormData({ code: '', discountPercent: '', maxDiscount: '', expiryDate: '', usageLimit: '' })
+      setFormData({ 
+        code: '', 
+        discountPercent: '', 
+        maxDiscount: '', 
+        expiryDate: '', 
+        usageLimit: '',
+        isVisibleOnHome: false,
+        price: '',
+        allowedJobsCount: '',
+        jobDurationMinutes: '60',
+        description: ''
+      })
       await loadCoupons()
       alert('Coupon created successfully!')
     } catch (error: any) {
@@ -217,7 +238,7 @@ export default function CouponManagement() {
       {/* Create Coupon Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold">Create New Coupon</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-700">
@@ -283,6 +304,69 @@ export default function CouponManagement() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                 />
               </div>
+
+              <div className="border-t pt-4 space-y-4">
+                <h3 className="font-semibold text-gray-900">Job Package Settings (Optional)</h3>
+                
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isVisibleOnHome"
+                    checked={formData.isVisibleOnHome}
+                    onChange={e => setFormData({ ...formData, isVisibleOnHome: e.target.checked })}
+                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                  />
+                  <label htmlFor="isVisibleOnHome" className="text-sm font-medium text-gray-700">
+                    Visible on Customer Home Screen
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Package Price (₹)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 1500"
+                      value={formData.price}
+                      onChange={e => setFormData({ ...formData, price: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Jobs</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 3"
+                      value={formData.allowedJobsCount}
+                      onChange={e => setFormData({ ...formData, allowedJobsCount: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Job Duration (Mins)</label>
+                  <select
+                    value={formData.jobDurationMinutes}
+                    onChange={e => setFormData({ ...formData, jobDurationMinutes: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                  >
+                    <option value="60">60 Minutes</option>
+                    <option value="90">90 Minutes</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Package Description</label>
+                  <textarea
+                    placeholder="Describe what's included..."
+                    value={formData.description}
+                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none h-20"
+                  />
+                </div>
+              </div>
+
               <div className="pt-4 flex justify-end gap-3">
                 <button
                   type="button"
