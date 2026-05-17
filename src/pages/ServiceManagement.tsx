@@ -27,6 +27,7 @@ interface ServiceItem {
   categoryId: string
   category?: ServiceCategory
   durationMinutes: number
+  imageUrl?: string
 }
 
 export default function ServiceManagement() {
@@ -41,12 +42,17 @@ export default function ServiceManagement() {
 
   // Form states
   const [newCategory, setNewCategory] = useState({ name: '', icon: 'briefcase', active: true })
+  
+  // Track editing service item
+  const [editingItem, setEditingItem] = useState<ServiceItem | null>(null)
+  
   const [newItem, setNewItem] = useState({
     name: '',
     description: '',
     price: '',
     categoryId: '',
-    durationMinutes: 60
+    durationMinutes: 60,
+    imageUrl: ''
   })
 
   useEffect(() => {
@@ -86,20 +92,53 @@ export default function ServiceManagement() {
     }
   }
 
+  const handleEditItem = (item: ServiceItem) => {
+    setEditingItem(item)
+    setNewItem({
+      name: item.name,
+      description: item.description,
+      price: item.price.toString(),
+      categoryId: item.categoryId,
+      durationMinutes: item.durationMinutes,
+      imageUrl: item.imageUrl || ''
+    })
+    setShowItemModal(true)
+  }
+
+  const handleCloseItemModal = () => {
+    setShowItemModal(false)
+    setEditingItem(null)
+    setNewItem({
+      name: '',
+      description: '',
+      price: '',
+      categoryId: '',
+      durationMinutes: 60,
+      imageUrl: ''
+    })
+  }
+
   const handleCreateItem = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const response = await apiClient.post('/admin/service-items', {
+      const payload = {
         ...newItem,
         price: parseFloat(newItem.price as string)
-      })
+      }
+
+      let response
+      if (editingItem) {
+        response = await apiClient.patch(`/admin/service-items/${editingItem.id}`, payload)
+      } else {
+        response = await apiClient.post('/admin/service-items', payload)
+      }
+
       if (response.success) {
-        setShowItemModal(false)
-        setNewItem({ name: '', description: '', price: '', categoryId: '', durationMinutes: 60 })
+        handleCloseItemModal()
         fetchData()
       }
     } catch (error) {
-      console.error('Error creating service item:', error)
+      console.error('Error saving service item:', error)
     }
   }
 
@@ -216,9 +255,22 @@ export default function ServiceManagement() {
               {serviceItems.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-gray-900">{item.name}</span>
-                      <span className="text-xs text-gray-500 truncate max-w-xs">{item.description}</span>
+                    <div className="flex items-center gap-3">
+                      {item.imageUrl ? (
+                        <img 
+                          src={item.imageUrl} 
+                          alt={item.name} 
+                          className="w-10 h-10 rounded-lg object-cover border border-gray-100 bg-gray-50"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center text-lg">
+                          🛠️
+                        </div>
+                      )}
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-gray-900">{item.name}</span>
+                        <span className="text-xs text-gray-500 truncate max-w-xs">{item.description}</span>
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -231,8 +283,11 @@ export default function ServiceManagement() {
                     <span className="text-sm text-gray-500">{item.durationMinutes} min</span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button className="text-gray-400 hover:text-gray-600 transition-colors">
-                      <MoreVertical size={20} />
+                    <button 
+                      onClick={() => handleEditItem(item)}
+                      className="text-black font-semibold hover:text-gray-600 transition-colors text-sm px-3 py-1.5 border border-gray-200 rounded-lg bg-white hover:bg-gray-50"
+                    >
+                      Edit
                     </button>
                   </td>
                 </tr>
@@ -317,8 +372,8 @@ export default function ServiceManagement() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-xl animate-in fade-in zoom-in duration-200">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="text-lg font-bold">Add Service Item</h3>
-              <button onClick={() => setShowItemModal(false)} className="text-gray-400 hover:text-gray-600">
+              <h3 className="text-lg font-bold">{editingItem ? 'Edit Service Item' : 'Add Service Item'}</h3>
+              <button onClick={handleCloseItemModal} className="text-gray-400 hover:text-gray-600">
                 <XCircle size={24} />
               </button>
             </div>
@@ -383,10 +438,62 @@ export default function ServiceManagement() {
                   placeholder="Describe the service details..."
                 />
               </div>
+
+              {/* Service Photo Upload Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Service Photo</label>
+                <div className="flex gap-4 items-center">
+                  {newItem.imageUrl ? (
+                    <div className="relative w-24 h-24 rounded-xl border border-gray-200 overflow-hidden group">
+                      <img src={newItem.imageUrl} className="w-full h-full object-cover" alt="Preview" />
+                      <button
+                        type="button"
+                        onClick={() => setNewItem({ ...newItem, imageUrl: '' })}
+                        className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity font-medium text-xs"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-200 hover:border-gray-400 cursor-pointer flex flex-col items-center justify-center text-gray-400 transition-colors bg-gray-50">
+                      <Plus size={20} />
+                      <span className="text-[10px] font-semibold mt-1">Upload</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setNewItem({ ...newItem, imageUrl: reader.result as string });
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      placeholder="Or paste an Image URL here..."
+                      value={newItem.imageUrl}
+                      onChange={(e) => setNewItem({ ...newItem, imageUrl: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all text-xs"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      Supports JPEG, PNG, or Data URL.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="pt-4 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setShowItemModal(false)}
+                  onClick={handleCloseItemModal}
                   className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Cancel
@@ -395,7 +502,7 @@ export default function ServiceManagement() {
                   type="submit"
                   className="flex-1 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
                 >
-                  Create Service
+                  {editingItem ? 'Save Changes' : 'Create Service'}
                 </button>
               </div>
             </form>
