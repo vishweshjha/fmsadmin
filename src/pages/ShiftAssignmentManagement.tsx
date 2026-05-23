@@ -86,7 +86,10 @@ export default function ShiftAssignmentManagement() {
         fetchShiftTypes().catch(() => [])
       ])
       // Filter out only active and approved service providers for roster safety
-      const activeProviders = providersRes.filter(p => p.status === 'ACTIVE' || p.Kyc_status === 'APPROVED')
+      const activeProviders = providersRes.filter(p => 
+        p.status?.toUpperCase() === 'ACTIVE' || 
+        p.Kyc_status?.toUpperCase() === 'APPROVED'
+      )
       setProviders(activeProviders)
       setShiftTypes(shiftsRes)
       await loadAssignments()
