@@ -514,3 +514,48 @@ export async function deleteShiftType(id: string): Promise<any> {
   if (!res.success) throw new Error(res.error?.message || 'Failed to delete shift configuration')
   return res.data
 }
+
+// ─── Shift Assignments ────────────────────────────────────────────────────────
+export interface ShiftAssignment {
+  id?: string
+  provider_id: string
+  shift_type_id: string
+  assignment_date: string
+  Status?: string
+  created_at?: string
+  updated_at?: string
+  // UI Display helpers:
+  providerName?: string
+  shiftName?: string
+  durationHours?: number
+  dailySalary?: number
+  city?: string
+  area?: string
+}
+
+export async function fetchShiftAssignments(params?: { provider_id?: string; shift_type_id?: string; date?: string }): Promise<ShiftAssignment[]> {
+  const res = await apiClient.get<any>(API_ENDPOINTS.SHIFT_ASSIGNMENTS.LIST, params)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to load shift assignments')
+  const data = res.data
+  if (Array.isArray(data)) return data
+  if (data?.data) return data.data
+  return []
+}
+
+export async function assignShift(data: { provider_id: string; shift_type_id: string; assignment_date: string }): Promise<any> {
+  const res = await apiClient.post(API_ENDPOINTS.SHIFT_ASSIGNMENTS.ASSIGN, data)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to assign provider to shift')
+  return res.data
+}
+
+export async function updateShiftAssignmentStatus(id: string, status: string): Promise<any> {
+  const res = await apiClient.patch(API_ENDPOINTS.SHIFT_ASSIGNMENTS.UPDATE_STATUS(id), { status })
+  if (!res.success) throw new Error(res.error?.message || 'Failed to update shift assignment status')
+  return res.data
+}
+
+export async function deleteShiftAssignment(id: string): Promise<any> {
+  const res = await apiClient.delete(API_ENDPOINTS.SHIFT_ASSIGNMENTS.DELETE(id))
+  if (!res.success) throw new Error(res.error?.message || 'Failed to delete/cancel shift assignment')
+  return res.data
+}

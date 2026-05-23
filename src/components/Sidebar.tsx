@@ -35,6 +35,7 @@ const menuItems: MenuItem[] = [
   { path: '/analytics', icon: Clock, label: 'Analytics & Reporting', requiredRoles: ['Super Admin', 'Operations Admin', 'Finance Admin'] },
   { path: '/coupons', icon: Tag, label: 'Coupons', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },
   { path: '/shifts', icon: Timer, label: 'Shift Configuration', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },
+  { path: '/shifts/assignments', icon: Calendar, label: 'Shift Assignments', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },
   { path: '/audit', icon: Shield, label: 'Audit & Logging', requiredRoles: ['Super Admin', 'Compliance Officer'] },
 ]
 

@@ -111,6 +111,14 @@ export const API_ENDPOINTS = {
     UPDATE: (id: string) => `${BASE_URL}/admin/shifts/${id}`,
     DELETE: (id: string) => `${BASE_URL}/admin/shifts/${id}`,
   },
+
+  // Admin - Shift Assignments
+  SHIFT_ASSIGNMENTS: {
+    LIST: `${BASE_URL}/admin/shifts/assignments/all`,
+    ASSIGN: `${BASE_URL}/admin/shifts/assign`,
+    UPDATE_STATUS: (id: string) => `${BASE_URL}/admin/shifts/assignments/${id}/status`,
+    DELETE: (id: string) => `${BASE_URL}/admin/shifts/assignments/${id}`,
+  },
 } as const
 
 export default API_ENDPOINTS
