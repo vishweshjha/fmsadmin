@@ -103,6 +103,14 @@ export const API_ENDPOINTS = {
     LIST: `${BASE_URL}/admin/coupons`,
     DELETE: (id: string) => `${BASE_URL}/admin/coupons/${id}`,
   },
+
+  // Admin - Shifts
+  SHIFTS: {
+    LIST: `${BASE_URL}/admin/shifts`,
+    CREATE: `${BASE_URL}/admin/shifts`,
+    UPDATE: (id: string) => `${BASE_URL}/admin/shifts/${id}`,
+    DELETE: (id: string) => `${BASE_URL}/admin/shifts/${id}`,
+  },
 } as const
 
 export default API_ENDPOINTS

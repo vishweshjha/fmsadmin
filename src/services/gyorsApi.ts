@@ -473,3 +473,44 @@ export async function deleteCoupon(id: string): Promise<any> {
   if (!res.success) throw new Error(res.error?.message || 'Failed to delete coupon')
   return res.data
 }
+
+// ─── Shifts ───────────────────────────────────────────────────────────────────
+export interface ShiftType {
+  id?: string
+  Shift_Name: string
+  Duration_hours: number
+  Daily_Salary: number | string
+  Overtime_Rate: number | string
+  attendancePercent?: number
+  targetJobs?: number
+  status?: 'ACTIVE' | 'DISABLED'
+  createdAt?: string
+  updatedAt?: string
+}
+
+export async function fetchShiftTypes(): Promise<ShiftType[]> {
+  const res = await apiClient.get<any>(API_ENDPOINTS.SHIFTS.LIST)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to load shift configurations')
+  const data = res.data
+  if (Array.isArray(data)) return data
+  if (data?.data) return data.data
+  return []
+}
+
+export async function createShiftType(data: ShiftType): Promise<any> {
+  const res = await apiClient.post(API_ENDPOINTS.SHIFTS.CREATE, data)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to create shift configuration')
+  return res.data
+}
+
+export async function updateShiftType(id: string, data: Partial<ShiftType>): Promise<any> {
+  const res = await apiClient.patch(API_ENDPOINTS.SHIFTS.UPDATE(id), data)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to update shift configuration')
+  return res.data
+}
+
+export async function deleteShiftType(id: string): Promise<any> {
+  const res = await apiClient.delete(API_ENDPOINTS.SHIFTS.DELETE(id))
+  if (!res.success) throw new Error(res.error?.message || 'Failed to delete shift configuration')
+  return res.data
+}

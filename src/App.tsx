@@ -17,6 +17,7 @@ import AuditLogging from './pages/AuditLogging'
 import ServiceProviderManagement from './pages/ServiceProviderManagement'
 import ServiceManagement from './pages/ServiceManagement'
 import CouponManagement from './pages/CouponManagement'
+import ShiftConfiguration from './pages/ShiftConfiguration'
 import { UserRole } from './context/AuthContext'
 
 // Role-based route permissions
@@ -31,6 +32,7 @@ const rolePermissions: Record<string, UserRole[]> = {
   '/settlements': ['Super Admin', 'Finance Admin'],
   '/analytics': ['Super Admin', 'Operations Admin', 'Finance Admin'],
   '/coupons': ['Super Admin', 'Operations Admin', 'Admin'],
+  '/shifts': ['Super Admin', 'Operations Admin', 'Admin'],
   '/audit': ['Super Admin', 'Compliance Officer'],
 }
 
@@ -161,6 +163,16 @@ function AppRoutes() {
           <ProtectedRoute requiredRoles={rolePermissions['/coupons']}>
             <Layout>
               <CouponManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/shifts"
+        element={
+          <ProtectedRoute requiredRoles={rolePermissions['/shifts']}>
+            <Layout>
+              <ShiftConfiguration />
             </Layout>
           </ProtectedRoute>
         }
