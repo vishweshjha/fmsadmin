@@ -559,3 +559,45 @@ export async function deleteShiftAssignment(id: string): Promise<any> {
   if (!res.success) throw new Error(res.error?.message || 'Failed to delete/cancel shift assignment')
   return res.data
 }
+
+// ─── Attendance Management ───────────────────────────────────────────────────
+export interface ProviderAttendance {
+  id?: string
+  provider_id: string
+  shift_type_id: string
+  attendance_date: string
+  in_time: string
+  out_time?: string
+  total_hours: number
+  Status: 'PRESENT' | 'HALF_DAY' | 'LATE' | 'ABSENT'
+  // UI helper fields:
+  providerName?: string
+  providerPhone?: string
+  shiftName?: string
+  baseSalary?: number
+}
+
+export async function fetchAttendance(params?: { date?: string; providerId?: string; status?: string }): Promise<ProviderAttendance[]> {
+  const res = await apiClient.get<any>(API_ENDPOINTS.ATTENDANCE.LIST, params)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to load attendance logs')
+  const data = res.data as any
+  if (Array.isArray(data)) return data
+  if (data?.data && Array.isArray(data.data)) return data.data
+  return []
+}
+
+export async function adjustAttendanceHours(id: string, data: { in_time: string; out_time: string; Status: string }): Promise<any> {
+  const res = await apiClient.patch(API_ENDPOINTS.ATTENDANCE.ADJUST(id), data)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to adjust attendance hours')
+  return res.data
+}
+
+export async function fetchProviderTelemetry(providerId: string, params?: { date?: string }): Promise<any[]> {
+  const res = await apiClient.get<any[]>(API_ENDPOINTS.ATTENDANCE.GPS_LOGS(providerId), params)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to load provider GPS telemetry logs')
+  const data = res.data as any
+  if (Array.isArray(data)) return data
+  if (data?.data && Array.isArray(data.data)) return data.data
+  return []
+}
+

@@ -12,7 +12,8 @@ import {
   LogOut,
   Briefcase,
   Tag,
-  Timer
+  Timer,
+  Fingerprint
 } from 'lucide-react'
 import { useAuth, UserRole } from '../context/AuthContext'
 
@@ -36,6 +37,7 @@ const menuItems: MenuItem[] = [
   { path: '/coupons', icon: Tag, label: 'Coupons', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },
   { path: '/shifts', icon: Timer, label: 'Shift Configuration', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },
   { path: '/shifts/assignments', icon: Calendar, label: 'Shift Assignments', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },
+  { path: '/attendance', icon: Fingerprint, label: 'Attendance Management', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },
   { path: '/audit', icon: Shield, label: 'Audit & Logging', requiredRoles: ['Super Admin', 'Compliance Officer'] },
 ]
 

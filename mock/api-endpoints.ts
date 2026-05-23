@@ -119,6 +119,13 @@ export const API_ENDPOINTS = {
     UPDATE_STATUS: (id: string) => `${BASE_URL}/admin/shifts/assignments/${id}/status`,
     DELETE: (id: string) => `${BASE_URL}/admin/shifts/assignments/${id}`,
   },
+
+  // Admin - Attendance
+  ATTENDANCE: {
+    LIST: `${BASE_URL}/admin/attendance`,
+    ADJUST: (id: string) => `${BASE_URL}/admin/attendance/${id}/adjust`,
+    GPS_LOGS: (providerId: string) => `${BASE_URL}/admin/attendance/providers/${providerId}/gps`,
+  },
 } as const
 
 export default API_ENDPOINTS
