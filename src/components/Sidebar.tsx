@@ -36,6 +36,7 @@ const menuItems: MenuItem[] = [
   { path: '/settlements', icon: TrendingUp, label: 'Settlements & Finance', requiredRoles: ['Super Admin', 'Finance Admin'] },
   { path: '/salary-ledger', icon: DollarSign, label: 'Salary Ledger', requiredRoles: ['Super Admin', 'Finance Admin'] },
   { path: '/incentives-penalties', icon: Sparkles, label: 'Incentives & Penalties', requiredRoles: ['Super Admin', 'Finance Admin'] },
+  { path: '/payroll-settlements', icon: FileCheck, label: 'Payroll Settlements', requiredRoles: ['Super Admin', 'Finance Admin'] },
   { path: '/analytics', icon: Clock, label: 'Analytics & Reporting', requiredRoles: ['Super Admin', 'Operations Admin', 'Finance Admin'] },
   { path: '/coupons', icon: Tag, label: 'Coupons', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },
   { path: '/shifts', icon: Timer, label: 'Shift Configuration', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },

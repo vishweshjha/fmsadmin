@@ -992,5 +992,249 @@ export async function deletePayrollRule(id: string): Promise<void> {
   }
 }
 
+// ─── Payroll Settlements & Payout Batches (FR-PAY-009) ─────────────────────────
+
+export interface PayoutSettlementItem {
+  id: string
+  providerId: string
+  providerName: string
+  providerPhone: string
+  amount: number
+  bankName: string
+  accountNumber: string
+  ifscCode: string
+  status: 'Approve' | 'Hold' | 'Reject'
+  city?: string
+  ledgerDate: string
+}
+
+export interface SettlementBatch {
+  id: string
+  batchCode: string
+  dateFrom: string
+  dateTo: string
+  totalAmount: number
+  providerCount: number
+  status: 'Draft' | 'Validating' | 'Processing' | 'Settled'
+  processedBy: string
+  createdAt: string
+}
+
+let memoryPayoutsStore: PayoutSettlementItem[] | null = null
+let memoryBatchesStore: SettlementBatch[] | null = null
+
+const PRESET_PAYOUT_SETTLEMENTS: PayoutSettlementItem[] = [
+  {
+    id: 'ps-1',
+    providerId: 'john-doe-uuid',
+    providerName: 'John Doe',
+    providerPhone: '+919876543210',
+    amount: 1150,
+    bankName: 'HDFC Bank',
+    accountNumber: 'XXXXXX8822',
+    ifscCode: 'HDFC0000104',
+    status: 'Approve',
+    city: 'Mumbai',
+    ledgerDate: new Date().toISOString().split('T')[0]
+  },
+  {
+    id: 'ps-2',
+    providerId: 'ravi-kumar-uuid',
+    providerName: 'Ravi Kumar',
+    providerPhone: '+919999988888',
+    amount: 900,
+    bankName: 'State Bank of India',
+    accountNumber: 'XXXXXX5544',
+    ifscCode: 'SBIN0000301',
+    status: 'Hold',
+    city: 'Budapest',
+    ledgerDate: new Date().toISOString().split('T')[0]
+  },
+  {
+    id: 'ps-3',
+    providerId: 'sarah-jenkins-uuid',
+    providerName: 'Sarah Jenkins',
+    providerPhone: '+1234567890',
+    amount: 1250,
+    bankName: 'Barclays Bank',
+    accountNumber: 'XXXXXX1199',
+    ifscCode: 'BARC0200400',
+    status: 'Approve',
+    city: 'London',
+    ledgerDate: new Date().toISOString().split('T')[0]
+  },
+  {
+    id: 'ps-4',
+    providerId: 'amit-patel-uuid',
+    providerName: 'Amit Patel',
+    providerPhone: '+919111122222',
+    amount: 700,
+    bankName: 'ICICI Bank',
+    accountNumber: 'XXXXXX9911',
+    ifscCode: 'ICIC0000222',
+    status: 'Approve',
+    city: 'Mumbai',
+    ledgerDate: new Date().toISOString().split('T')[0]
+  },
+  {
+    id: 'ps-5',
+    providerId: 'priya-sharma-uuid',
+    providerName: 'Priya Sharma',
+    providerPhone: '+919333344444',
+    amount: 1300,
+    bankName: 'Axis Bank',
+    accountNumber: 'XXXXXX4433',
+    ifscCode: 'UTIB0000052',
+    status: 'Approve',
+    city: 'Budapest',
+    ledgerDate: new Date().toISOString().split('T')[0]
+  },
+  {
+    id: 'ps-6',
+    providerId: 'david-miller-uuid',
+    providerName: 'David Miller',
+    providerPhone: '+447777888888',
+    amount: 950,
+    bankName: 'HSBC Bank',
+    accountNumber: 'XXXXXX3355',
+    ifscCode: 'HSBC0000024',
+    status: 'Reject',
+    city: 'London',
+    ledgerDate: new Date().toISOString().split('T')[0]
+  }
+]
+
+const PRESET_SETTLEMENT_BATCHES: SettlementBatch[] = [
+  {
+    id: 'batch-1',
+    batchCode: 'BATCH-20260520-A',
+    dateFrom: '2026-05-13',
+    dateTo: '2026-05-20',
+    totalAmount: 24500,
+    providerCount: 18,
+    status: 'Settled',
+    processedBy: 'Super Admin',
+    createdAt: '2026-05-20T17:30:00Z'
+  },
+  {
+    id: 'batch-2',
+    batchCode: 'BATCH-20260513-A',
+    dateFrom: '2026-05-06',
+    dateTo: '2026-05-13',
+    totalAmount: 18900,
+    providerCount: 14,
+    status: 'Settled',
+    processedBy: 'Finance Admin',
+    createdAt: '2026-05-13T16:15:00Z'
+  }
+]
+
+export async function fetchPayoutSettlements(params?: { dateFrom?: string; dateTo?: string }): Promise<PayoutSettlementItem[]> {
+  try {
+    const res = await apiClient.get<any>('/admin/payroll-settlements', params)
+    if (res.success && Array.isArray(res.data)) {
+      return res.data
+    }
+  } catch (e) {
+    console.warn('Backend fetchPayoutSettlements failed, falling back to mock dataset.', e)
+  }
+
+  if (!memoryPayoutsStore) {
+    memoryPayoutsStore = [...PRESET_PAYOUT_SETTLEMENTS]
+  }
+  return memoryPayoutsStore
+}
+
+export async function updatePayoutSettlementStatus(id: string, status: 'Approve' | 'Hold' | 'Reject'): Promise<PayoutSettlementItem> {
+  try {
+    const res = await apiClient.patch<PayoutSettlementItem>(`/admin/payroll-settlements/${id}/status`, { status })
+    if (res.success && res.data) {
+      if (memoryPayoutsStore) {
+        memoryPayoutsStore = memoryPayoutsStore.map(item => item.id === id ? { ...item, status } : item)
+      }
+      return res.data
+    }
+  } catch (e) {
+    console.warn('Backend updatePayoutSettlementStatus failed, updating memory store.', e)
+  }
+
+  if (!memoryPayoutsStore) {
+    memoryPayoutsStore = [...PRESET_PAYOUT_SETTLEMENTS]
+  }
+
+  let updated: PayoutSettlementItem | null = null
+  memoryPayoutsStore = memoryPayoutsStore.map(item => {
+    if (item.id === id) {
+      updated = { ...item, status }
+      return updated
+    }
+    return item
+  })
+
+  if (!updated) {
+    throw new Error('Settlement item not found')
+  }
+  return updated
+}
+
+export async function createSettlementBatch(data: { dateFrom: string; dateTo: string; providerIds: string[] }): Promise<SettlementBatch> {
+  // Compute amount
+  if (!memoryPayoutsStore) {
+    memoryPayoutsStore = [...PRESET_PAYOUT_SETTLEMENTS]
+  }
+  const selectedPayouts = memoryPayoutsStore.filter(item => data.providerIds.includes(item.providerId))
+  const totalAmount = selectedPayouts.reduce((sum, item) => sum + item.amount, 0)
+  
+  const newBatch: SettlementBatch = {
+    id: `batch-${Date.now()}`,
+    batchCode: `BATCH-${data.dateFrom.replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`,
+    dateFrom: data.dateFrom,
+    dateTo: data.dateTo,
+    totalAmount,
+    providerCount: data.providerIds.length,
+    status: 'Settled',
+    processedBy: 'Finance Admin',
+    createdAt: new Date().toISOString()
+  }
+
+  try {
+    const res = await apiClient.post<SettlementBatch>('/admin/payroll-batches', newBatch)
+    if (res.success && res.data) {
+      if (memoryBatchesStore) {
+        memoryBatchesStore.push(res.data)
+      }
+      return res.data
+    }
+  } catch (e) {
+    console.warn('Backend createSettlementBatch failed, writing to memory store.', e)
+  }
+
+  if (!memoryBatchesStore) {
+    memoryBatchesStore = [...PRESET_SETTLEMENT_BATCHES]
+  }
+  memoryBatchesStore.push(newBatch)
+
+  // Optimistically set the status of processed payouts to Paid or remove them from pending list
+  // For safety in local memory, let's keep them but we can manage them
+  return newBatch
+}
+
+export async function fetchSettlementBatches(): Promise<SettlementBatch[]> {
+  try {
+    const res = await apiClient.get<any>('/admin/payroll-batches')
+    if (res.success && Array.isArray(res.data)) {
+      return res.data
+    }
+  } catch (e) {
+    console.warn('Backend fetchSettlementBatches failed, falling back to mock dataset.', e)
+  }
+
+  if (!memoryBatchesStore) {
+    memoryBatchesStore = [...PRESET_SETTLEMENT_BATCHES]
+  }
+  return memoryBatchesStore
+}
+
+
 
 
