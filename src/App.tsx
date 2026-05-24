@@ -21,6 +21,7 @@ import ShiftConfiguration from './pages/ShiftConfiguration'
 import ShiftAssignmentManagement from './pages/ShiftAssignmentManagement'
 import AttendanceManagement from './pages/AttendanceManagement'
 import SalaryLedger from './pages/SalaryLedger'
+import IncentivesPenalties from './pages/IncentivesPenalties'
 import { UserRole } from './context/AuthContext'
 
 // Role-based route permissions
@@ -33,12 +34,13 @@ const rolePermissions: Record<string, UserRole[]> = {
   '/bookings': ['Super Admin', 'Operations Admin', 'Support Agent'],
   '/pricing': ['Super Admin', 'Finance Admin'],
   '/settlements': ['Super Admin', 'Finance Admin'],
+  '/salary-ledger': ['Super Admin', 'Finance Admin'],
+  '/incentives-penalties': ['Super Admin', 'Finance Admin'],
   '/analytics': ['Super Admin', 'Operations Admin', 'Finance Admin'],
   '/coupons': ['Super Admin', 'Operations Admin', 'Admin'],
   '/shifts': ['Super Admin', 'Operations Admin', 'Admin'],
   '/shifts/assignments': ['Super Admin', 'Operations Admin', 'Admin'],
   '/attendance': ['Super Admin', 'Operations Admin', 'Admin'],
-  '/salary-ledger': ['Super Admin', 'Finance Admin'],
   '/audit': ['Super Admin', 'Compliance Officer'],
 }
 
@@ -129,6 +131,16 @@ function AppRoutes() {
           <ProtectedRoute requiredRoles={rolePermissions['/salary-ledger']}>
             <Layout>
               <SalaryLedger />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/incentives-penalties"
+        element={
+          <ProtectedRoute requiredRoles={rolePermissions['/incentives-penalties']}>
+            <Layout>
+              <IncentivesPenalties />
             </Layout>
           </ProtectedRoute>
         }

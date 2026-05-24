@@ -816,4 +816,181 @@ export async function updateSalaryLedger(
   return updatedItem
 }
 
+// ─── Incentives & Penalties Rule Configurations ─────────────────────────────────
+
+export interface PayrollRule {
+  id: string
+  name: string
+  type: 'Incentive' | 'Penalty'
+  category: 'Attendance' | 'Rating' | 'Shift' | 'Compliance'
+  conditionText: string
+  valueType: 'Flat' | 'Percentage'
+  value: number
+  city: string
+  status: 'Active' | 'Inactive'
+  createdAt: string
+}
+
+let memoryRulesStore: PayrollRule[] | null = null
+
+const PRESET_PAYROLL_RULES: PayrollRule[] = [
+  {
+    id: 'rule-attendance-bonus',
+    name: 'Full Attendance Bonus',
+    type: 'Incentive',
+    category: 'Attendance',
+    conditionText: 'Complete all assigned shifts in the week with 100% attendance',
+    valueType: 'Flat',
+    value: 500,
+    city: 'All',
+    status: 'Active',
+    createdAt: '2026-01-10T12:00:00Z'
+  },
+  {
+    id: 'rule-late-login-penalty',
+    name: 'Late Login Penalty',
+    type: 'Penalty',
+    category: 'Attendance',
+    conditionText: 'Clock-in recorded after shift start time (>15 mins late)',
+    valueType: 'Flat',
+    value: 50,
+    city: 'All',
+    status: 'Active',
+    createdAt: '2026-01-11T12:00:00Z'
+  },
+  {
+    id: 'rule-high-rating-bonus',
+    name: 'High Customer Rating Incentive',
+    type: 'Incentive',
+    category: 'Rating',
+    conditionText: 'Maintain an average customer feedback rating of 4.8 or above',
+    valueType: 'Percentage',
+    value: 10, // 10% of base
+    city: 'All',
+    status: 'Active',
+    createdAt: '2026-01-12T12:00:00Z'
+  },
+  {
+    id: 'rule-safety-warning-penalty',
+    name: 'Safety & Protocol Warning',
+    type: 'Penalty',
+    category: 'Compliance',
+    conditionText: 'Levied upon safety checks failures or protocol violation reports',
+    valueType: 'Flat',
+    value: 120,
+    city: 'All',
+    status: 'Active',
+    createdAt: '2026-01-13T12:00:00Z'
+  },
+  {
+    id: 'rule-perfect-weekend-bonus',
+    name: 'Perfect Weekend Attendance',
+    type: 'Incentive',
+    category: 'Attendance',
+    conditionText: 'Complete weekend shifts successfully without late check-ins',
+    valueType: 'Flat',
+    value: 300,
+    city: 'Mumbai',
+    status: 'Active',
+    createdAt: '2026-01-15T12:00:00Z'
+  },
+  {
+    id: 'rule-early-checkout-penalty',
+    name: 'Early Checkout Deduction',
+    type: 'Penalty',
+    category: 'Attendance',
+    conditionText: 'Leaving shift duty early without permission (>30 mins early)',
+    valueType: 'Percentage',
+    value: 5, // 5% of base
+    city: 'London',
+    status: 'Active',
+    createdAt: '2026-01-20T12:00:00Z'
+  }
+]
+
+export async function fetchPayrollRules(): Promise<PayrollRule[]> {
+  try {
+    const res = await apiClient.get<any>('/admin/payroll-rules')
+    if (res.success && Array.isArray(res.data)) {
+      return res.data
+    }
+  } catch (e) {
+    console.warn('Backend fetchPayrollRules failed, falling back to mock rule configurations.', e)
+  }
+
+  if (!memoryRulesStore) {
+    memoryRulesStore = [...PRESET_PAYROLL_RULES]
+  }
+  return memoryRulesStore
+}
+
+export async function createPayrollRule(rule: PayrollRule): Promise<PayrollRule> {
+  try {
+    const res = await apiClient.post<PayrollRule>('/admin/payroll-rules', rule)
+    if (res.success && res.data) {
+      if (memoryRulesStore) {
+        memoryRulesStore.push(res.data)
+      }
+      return res.data
+    }
+  } catch (e) {
+    console.warn('Backend createPayrollRule failed, writing to memory store.', e)
+  }
+
+  if (!memoryRulesStore) {
+    memoryRulesStore = [...PRESET_PAYROLL_RULES]
+  }
+  memoryRulesStore.push(rule)
+  return rule
+}
+
+export async function updatePayrollRule(id: string, updates: Partial<PayrollRule>): Promise<PayrollRule> {
+  try {
+    const res = await apiClient.patch<PayrollRule>(`/admin/payroll-rules/${id}`, updates)
+    if (res.success && res.data) {
+      if (memoryRulesStore) {
+        memoryRulesStore = memoryRulesStore.map(r => r.id === id ? { ...r, ...res.data! } : r)
+      }
+      return res.data
+    }
+  } catch (e) {
+    console.warn('Backend updatePayrollRule failed, updating memory store.', e)
+  }
+
+  if (!memoryRulesStore) {
+    memoryRulesStore = [...PRESET_PAYROLL_RULES]
+  }
+  
+  let updated: PayrollRule | null = null
+  memoryRulesStore = memoryRulesStore.map(r => {
+    if (r.id === id) {
+      updated = { ...r, ...updates }
+      return updated
+    }
+    return r
+  })
+
+  if (!updated) {
+    throw new Error('Payroll rule not found')
+  }
+  return updated
+}
+
+export async function deletePayrollRule(id: string): Promise<void> {
+  try {
+    await apiClient.delete(`/admin/payroll-rules/${id}`)
+    if (memoryRulesStore) {
+      memoryRulesStore = memoryRulesStore.filter(r => r.id !== id)
+    }
+    return
+  } catch (e) {
+    console.warn('Backend deletePayrollRule failed, removing from memory store.', e)
+  }
+
+  if (memoryRulesStore) {
+    memoryRulesStore = memoryRulesStore.filter(r => r.id !== id)
+  }
+}
+
+
 
