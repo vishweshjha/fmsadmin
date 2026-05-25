@@ -23,6 +23,7 @@ import AttendanceManagement from './pages/AttendanceManagement'
 import SalaryLedger from './pages/SalaryLedger'
 import IncentivesPenalties from './pages/IncentivesPenalties'
 import PayrollSettlement from './pages/PayrollSettlement'
+import PayrollReports from './pages/PayrollReports'
 import { UserRole } from './context/AuthContext'
 
 // Role-based route permissions
@@ -38,6 +39,7 @@ const rolePermissions: Record<string, UserRole[]> = {
   '/salary-ledger': ['Super Admin', 'Finance Admin'],
   '/incentives-penalties': ['Super Admin', 'Finance Admin'],
   '/payroll-settlements': ['Super Admin', 'Finance Admin'],
+  '/payroll-reports': ['Super Admin', 'Finance Admin'],
   '/analytics': ['Super Admin', 'Operations Admin', 'Finance Admin'],
   '/coupons': ['Super Admin', 'Operations Admin', 'Admin'],
   '/shifts': ['Super Admin', 'Operations Admin', 'Admin'],
@@ -153,6 +155,16 @@ function AppRoutes() {
           <ProtectedRoute requiredRoles={rolePermissions['/payroll-settlements']}>
             <Layout>
               <PayrollSettlement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/payroll-reports"
+        element={
+          <ProtectedRoute requiredRoles={rolePermissions['/payroll-reports']}>
+            <Layout>
+              <PayrollReports />
             </Layout>
           </ProtectedRoute>
         }

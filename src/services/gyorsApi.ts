@@ -1235,6 +1235,69 @@ export async function fetchSettlementBatches(): Promise<SettlementBatch[]> {
   return memoryBatchesStore
 }
 
+// ─── Payroll Generated Reports History (FR-PAY-011) ───────────────────────────
+
+export interface PayrollReportRecord {
+  id: string
+  reportName: string
+  reportType: 'Disbursement Summary' | 'Incentives & Penalties' | 'Provider Earnings' | 'Audit Trail'
+  dateFrom: string
+  dateTo: string
+  recordCount: number
+  generatedBy: string
+  fileFormat: 'PDF' | 'EXCEL' | 'CSV'
+  fileSize: string
+  createdAt: string
+}
+
+let memoryReportsStore: PayrollReportRecord[] | null = null
+
+export async function fetchGeneratedReports(): Promise<PayrollReportRecord[]> {
+  if (!memoryReportsStore) {
+    memoryReportsStore = [
+      {
+        id: 'rep-1',
+        reportName: 'Q1_Disbursement_Summary_2026',
+        reportType: 'Disbursement Summary',
+        dateFrom: '2026-01-01',
+        dateTo: '2026-03-31',
+        recordCount: 48,
+        generatedBy: 'Super Admin',
+        fileFormat: 'PDF',
+        fileSize: '1.2 MB',
+        createdAt: '2026-04-01T10:00:00Z'
+      },
+      {
+        id: 'rep-2',
+        reportName: 'Attendance_Incentives_May_2026',
+        reportType: 'Incentives & Penalties',
+        dateFrom: '2026-05-01',
+        dateTo: '2026-05-24',
+        recordCount: 156,
+        generatedBy: 'Finance Admin',
+        fileFormat: 'EXCEL',
+        fileSize: '340 KB',
+        createdAt: '2026-05-24T15:30:00Z'
+      }
+    ]
+  }
+  return memoryReportsStore
+}
+
+export async function createPayrollReport(report: Omit<PayrollReportRecord, 'id' | 'createdAt'>): Promise<PayrollReportRecord> {
+  const newReport: PayrollReportRecord = {
+    ...report,
+    id: `rep-${Date.now()}`,
+    createdAt: new Date().toISOString()
+  }
+  if (!memoryReportsStore) {
+    await fetchGeneratedReports()
+  }
+  memoryReportsStore!.push(newReport)
+  return newReport
+}
+
+
 
 
 
