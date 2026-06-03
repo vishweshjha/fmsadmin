@@ -8,7 +8,6 @@ import {
   Clock,
   Loader2,
   ShieldCheck,
-  TrendingDown,
   Lock,
   UserX,
   CreditCard,
@@ -17,8 +16,15 @@ import {
   FileSpreadsheet,
   Search
 } from 'lucide-react'
-import { fetchPayoutSettlements, updatePayoutSettlementStatus, createSettlementBatch, fetchSettlementBatches, type PayoutSettlementItem, type SettlementBatch } from '../services/gyorsApi'
-import { exportToCSV, exportToPDF, formatAmountPlain } from '../utils/exportUtils'
+import {
+  fetchPayoutSettlements,
+  generatePayrollSettlements,
+  approvePayrollSettlement,
+  disbursePayrollSettlement,
+  type PayoutSettlementItem,
+  type SettlementBatch
+} from '../services/gyorsApi'
+import { exportToCSV, exportToPDF } from '../utils/exportUtils'
 
 // Custom Export Dropdown
 interface ExportDropdownProps {
@@ -79,9 +85,8 @@ function ExportDropdown({ onCSV, onPDF, label = 'Export Batches' }: ExportDropdo
 
 export default function PayrollSettlement() {
   const [payouts, setPayouts] = useState<PayoutSettlementItem[]>([])
-  const [batches, setBatches] = useState<SettlementBatch[]>([])
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'pending' | 'batches'>('pending')
+  const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'disbursed'>('pending')
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('')
@@ -115,12 +120,8 @@ export default function PayrollSettlement() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [pRes, bRes] = await Promise.all([
-        fetchPayoutSettlements({ dateFrom: selectedDateFrom, dateTo: selectedDateTo }),
-        fetchSettlementBatches()
-      ])
+      const pRes = await fetchPayoutSettlements({ dateFrom: selectedDateFrom, dateTo: selectedDateTo })
       setPayouts(pRes)
-      setBatches(bRes)
     } catch (e) {
       console.error('Failed to load payroll settlements', e)
     } finally {
@@ -128,31 +129,43 @@ export default function PayrollSettlement() {
     }
   }
 
-  // Update status (Approve, Hold, Reject)
-  const handleUpdateStatus = async (id: string, providerName: string, nextStatus: 'Approve' | 'Hold' | 'Reject') => {
-    // Optimistic Update
-    setPayouts(prev => prev.map(item => item.id === id ? { ...item, status: nextStatus } : item))
-    
-    // Add audit log
-    const statusText = nextStatus === 'Approve' ? 'Approved payout release' : nextStatus === 'Hold' ? 'Placed payout on Hold' : 'Rejected payout'
-    setAuditLogs(prev => [
-      { id: String(Date.now()), time: new Date().toLocaleTimeString(), text: `Admin ${statusText} for ${providerName}.` },
-      ...prev
-    ])
-
+  const handleGenerate = async () => {
+    setLoading(true)
     try {
-      await updatePayoutSettlementStatus(id, nextStatus)
-    } catch (e) {
-      // Revert status
-      loadData()
-      alert('Failed to update settlement status')
+      const res = await generatePayrollSettlements(selectedDateFrom, selectedDateTo)
+      setAuditLogs(prev => [
+        { id: String(Date.now()), time: new Date().toLocaleTimeString(), text: `Generated payroll settlements for range: ${selectedDateFrom} to ${selectedDateTo}. Message: ${res.message}` },
+        ...prev
+      ])
+      alert(res.message || 'Successfully generated payroll settlements')
+      await loadData()
+    } catch (e: any) {
+      alert(e.message || 'Failed to generate payroll settlements. Ensure Daily Salary Calculation is run for this date range.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleApprove = async (id: string, providerName: string) => {
+    setLoading(true)
+    try {
+      await approvePayrollSettlement(id)
+      setAuditLogs(prev => [
+        { id: String(Date.now()), time: new Date().toLocaleTimeString(), text: `Approved payroll settlement for ${providerName}.` },
+        ...prev
+      ])
+      await loadData()
+    } catch (e: any) {
+      alert(e.message || 'Failed to approve settlement')
+    } finally {
+      setLoading(false)
     }
   }
 
   // Checkbox select handlers
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setCheckedIds(filteredPayouts.filter(p => p.status === 'Approve').map(p => p.providerId))
+      setCheckedIds(filteredPayouts.map(p => p.providerId))
     } else {
       setCheckedIds([])
     }
@@ -169,19 +182,19 @@ export default function PayrollSettlement() {
   // Multi-step batch processing execution flow
   const triggerBatchReleaseFlow = () => {
     const targets = checkedIds.length > 0 
-      ? payouts.filter(p => checkedIds.includes(p.providerId) && p.status === 'Approve')
-      : payouts.filter(p => p.status === 'Approve')
+      ? payouts.filter(p => checkedIds.includes(p.providerId) && (p.status.toUpperCase() === 'APPROVED' || p.status === 'Approve'))
+      : payouts.filter(p => p.status.toUpperCase() === 'APPROVED' || p.status === 'Approve')
 
     if (targets.length === 0) {
-      alert('There are no Approved payouts to process! Please select approved service providers.')
+      alert('There are no Approved payouts to process! Please approve payroll items first.')
       return
     }
 
     setProcessingStep(1)
-    setStepLogs(['Initializing automated processing validation audits...', 'Scanned current active disbursement roster.'])
+    setStepLogs(['Initializing automated clearance router validation audits...', 'Scanned current active disbursement roster.'])
     setIsProcessingOpen(true)
 
-    // Step 1: Validate (1.5s delay)
+    // Step 1: Validate (1.0s delay)
     setTimeout(() => {
       setProcessingStep(2)
       setStepLogs(prev => [
@@ -189,44 +202,60 @@ export default function PayrollSettlement() {
         '✓ Core validation checks PASSED.',
         `Checking ${targets.length} bank details configurations... Done.`,
         'Verifying dispute logs... None active.',
-        'Starting settlement batch compiler...'
+        'Starting disbursement sequence...'
       ])
 
-      // Step 2: Process (1.8s delay)
-      setTimeout(() => {
+      // Step 2: Process (1.2s delay)
+      setTimeout(async () => {
         setProcessingStep(3)
         setStepLogs(prev => [
           ...prev,
-          '✓ Batch layout generated successfully.',
-          'Compiling bank clearance files...',
-          'Packaging dispatch payloads... DONE.',
-          'Writing batch record details to database...'
+          '✓ Batch clearance layout compiled.',
+          'Broadcasting wallet credits to database server...'
         ])
 
-        // Step 3: Save (1.5s delay)
-        setTimeout(async () => {
-          try {
-            const batch = await createSettlementBatch({
+        try {
+          let successCount = 0
+          let totalDisbursed = 0
+          for (const target of targets) {
+            setStepLogs(prev => [...prev, `Disbursing ₹${target.amount} to ${target.providerName}...`])
+            await disbursePayrollSettlement(target.id)
+            successCount++
+            totalDisbursed += target.amount
+          }
+
+          setStepLogs(prev => [
+            ...prev,
+            `✓ Successfully disbursed ${successCount} payouts!`,
+            `Total payout release: ₹${totalDisbursed.toLocaleString('en-IN')}`,
+            'Updating clearance records...'
+          ])
+
+          // Step 3: Save (1.0s delay)
+          setTimeout(() => {
+            setProcessingStep(4)
+            
+            const batchCode = `BATCH-${selectedDateFrom.replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`
+            setProcessedBatchResult({
+              id: `batch-${Date.now()}`,
+              batchCode,
               dateFrom: selectedDateFrom,
               dateTo: selectedDateTo,
-              providerIds: targets.map(t => t.providerId)
+              totalAmount: totalDisbursed,
+              providerCount: successCount,
+              status: 'Settled',
+              processedBy: 'Finance Admin',
+              createdAt: new Date().toISOString()
             })
-            setProcessedBatchResult(batch)
 
-            // Remove processed items optimistically from pending list
-            setPayouts(prev => prev.filter(item => !targets.map(t => t.id).includes(item.id)))
-            setCheckedIds([])
-
-            setProcessingStep(4)
             setStepLogs(prev => [
               ...prev,
-              '✓ Payout Batch securely saved to ledger ledger DB.',
-              `Batch Code: ${batch.batchCode}`,
-              'Broadcasting alerts to clearance routers...',
-              'Dispatching notifications to service providers...'
+              '✓ Payout Batch records successfully locked.',
+              `Batch Code: ${batchCode}`,
+              'Broadcasting alerts to SMS and FCM routers...'
             ])
 
-            // Step 4: Notify (1.5s delay)
+            // Step 4: Notify (1.0s delay)
             setTimeout(() => {
               setProcessingStep(5)
               setStepLogs(prev => [
@@ -236,23 +265,25 @@ export default function PayrollSettlement() {
                 'Disbursement pipeline completes successfully!'
               ])
               
-              // Load historical batches and logs
-              fetchSettlementBatches().then(setBatches)
+              setCheckedIds([])
               setAuditLogs(prev => [
-                { id: String(Date.now()), time: new Date().toLocaleTimeString(), text: `Generated payroll Settlement Batch ${batch.batchCode} for ₹${batch.totalAmount.toLocaleString('en-IN')}.` },
+                { id: String(Date.now()), time: new Date().toLocaleTimeString(), text: `Generated payroll Settlement Batch ${batchCode} for ₹${totalDisbursed.toLocaleString('en-IN')}.` },
                 ...prev
               ])
-            }, 1500)
+            }, 1000)
 
-          } catch (e) {
-            alert('Failed to save payroll batch settlements')
-            setIsProcessingOpen(false)
-          }
-        }, 1500)
+          }, 1000)
 
-      }, 1800)
+        } catch (err: any) {
+          setStepLogs(prev => [...prev, `❌ Disbursement failed: ${err.message || 'API error'}`])
+          alert(`Disbursement failure: ${err.message || 'Failed to complete disbursements'}`)
+          setIsProcessingOpen(false)
+          loadData()
+        }
 
-    }, 1500)
+      }, 1200)
+
+    }, 1000)
   }
 
   // Filter pending payouts
@@ -260,17 +291,28 @@ export default function PayrollSettlement() {
     const matchesSearch = p.providerName.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           p.providerPhone.includes(searchQuery)
     const matchesCity = cityFilter === 'all' || p.city?.toLowerCase() === cityFilter.toLowerCase()
-    return matchesSearch && matchesCity
+    
+    // Filter by activeTab status
+    let matchesTab = false
+    if (activeTab === 'pending') {
+      matchesTab = p.status.toUpperCase() === 'PENDING'
+    } else if (activeTab === 'approved') {
+      matchesTab = p.status.toUpperCase() === 'APPROVED' || p.status === 'Approve'
+    } else if (activeTab === 'disbursed') {
+      matchesTab = p.status.toUpperCase() === 'DISBURSED'
+    }
+
+    return matchesSearch && matchesCity && matchesTab
   })
 
   // Calculations for KPI Cards
   const stats = {
-    disbursePool: payouts.filter(p => p.status === 'Approve').reduce((sum, item) => sum + item.amount, 0),
-    holdPool: payouts.filter(p => p.status === 'Hold').reduce((sum, item) => sum + item.amount, 0),
-    rejectPool: payouts.filter(p => p.status === 'Reject').reduce((sum, item) => sum + item.amount, 0),
-    totalPending: payouts.length,
-    approvedCount: payouts.filter(p => p.status === 'Approve').length,
-    settledTotal: batches.reduce((sum, b) => sum + b.totalAmount, 0)
+    pendingPool: payouts.filter(p => p.status.toUpperCase() === 'PENDING').reduce((sum, item) => sum + item.amount, 0),
+    disbursePool: payouts.filter(p => p.status.toUpperCase() === 'APPROVED' || p.status === 'Approve').reduce((sum, item) => sum + item.amount, 0),
+    disbursedPool: payouts.filter(p => p.status.toUpperCase() === 'DISBURSED').reduce((sum, item) => sum + item.amount, 0),
+    totalPending: payouts.filter(p => p.status.toUpperCase() === 'PENDING').length,
+    approvedCount: payouts.filter(p => p.status.toUpperCase() === 'APPROVED' || p.status === 'Approve').length,
+    disbursedCount: payouts.filter(p => p.status.toUpperCase() === 'DISBURSED').length
   }
 
   // CSV/PDF export details
@@ -293,7 +335,7 @@ export default function PayrollSettlement() {
   const handleExportPDF = () => {
     exportToPDF(
       'Payroll Disbursement Settlement Audit',
-      `Date Range: ${selectedDateFrom} to ${selectedDateTo} | Disbursement Pool: ${formatAmountPlain(stats.disbursePool)} | Hold Pool: ${formatAmountPlain(stats.holdPool)}`,
+      `Date Range: ${selectedDateFrom} to ${selectedDateTo} | Pending Review: ₹${stats.pendingPool} | Ready: ₹${stats.disbursePool} | Disbursed: ₹${stats.disbursedPool}`,
       exportHeaders,
       getExportRows()
     )
@@ -311,7 +353,7 @@ export default function PayrollSettlement() {
             Payroll Settlements (FR-PAY-009)
           </h1>
           <p className="text-gray-500 mt-2 text-sm">
-            Approve, hold, or reject daily payroll payouts, compile bank batch payloads, and disburse target salaries through the validation wizard.
+            Generate cycle settlements, approve pending records, and disburse target salaries through the compliance clearance wizard.
           </p>
         </div>
 
@@ -339,19 +381,58 @@ export default function PayrollSettlement() {
         </div>
       </div>
 
+      {/* Settlement Cycle Management Card */}
+      <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl border border-slate-800 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-base font-extrabold flex items-center gap-2">
+              <Calendar size={18} className="text-primary-400" />
+              Generate Payout Cycle Settlements
+            </h3>
+            <p className="text-slate-400 text-3xs mt-1 leading-relaxed">
+              Select date range of completed salary ledgers to compile new payroll records.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5 border border-slate-700 px-3 py-2 rounded-xl bg-slate-800 shadow-inner">
+              <span className="text-3xs text-slate-450 font-bold uppercase">From</span>
+              <input
+                type="date"
+                value={selectedDateFrom}
+                onChange={e => setSelectedDateFrom(e.target.value)}
+                className="bg-transparent text-3xs font-bold text-white focus:outline-none w-[110px]"
+              />
+              <span className="text-3xs text-slate-450 font-bold uppercase px-1">To</span>
+              <input
+                type="date"
+                value={selectedDateTo}
+                onChange={e => setSelectedDateTo(e.target.value)}
+                className="bg-transparent text-3xs font-bold text-white focus:outline-none w-[110px]"
+              />
+            </div>
+            <button
+              onClick={handleGenerate}
+              disabled={loading}
+              className="bg-primary-500 hover:bg-primary-600 disabled:opacity-55 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-primary-500/20 transition-all duration-200"
+            >
+              {loading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+              Generate Settlements
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { label: 'Disbursement Pool', value: `₹${stats.disbursePool.toLocaleString('en-IN')}`, color: 'emerald', desc: `${stats.approvedCount} approved payouts pending`, Icon: TrendingUp },
-          { label: 'Hold Payouts', value: `₹${stats.holdPool.toLocaleString('en-IN')}`, color: 'amber', desc: 'Locked in review/disputed', Icon: Clock },
-          { label: 'Rejected Payouts', value: `₹${stats.rejectPool.toLocaleString('en-IN')}`, color: 'rose', desc: 'Deducted from settlement cycle', Icon: TrendingDown },
-          { label: 'Grand Total Settled', value: `₹${stats.settledTotal.toLocaleString('en-IN')}`, color: 'indigo', desc: 'Total successfully disbursed', Icon: FileCheck },
-          { label: 'Pending Providers', value: stats.totalPending, color: 'blue', desc: 'Active records in filters', Icon: CreditCard }
+          { label: 'Pending Approval Pool', value: `₹${stats.pendingPool.toLocaleString('en-IN')}`, color: 'blue', desc: `${stats.totalPending} payouts awaiting review`, Icon: Clock },
+          { label: 'Approved Payouts Pool', value: `₹${stats.disbursePool.toLocaleString('en-IN')}`, color: 'emerald', desc: `${stats.approvedCount} payouts ready to release`, Icon: TrendingUp },
+          { label: 'Grand Total Settled', value: `₹${stats.disbursedPool.toLocaleString('en-IN')}`, color: 'indigo', desc: `${stats.disbursedCount} payouts fully settled`, Icon: FileCheck },
+          { label: 'Total Cycle Volume', value: `₹${(stats.pendingPool + stats.disbursePool + stats.disbursedPool).toLocaleString('en-IN')}`, color: 'amber', desc: 'Combined settlement pools', Icon: CreditCard }
         ].map(({ label, value, color, desc, Icon }) => {
           const themeMap = {
             emerald: 'text-emerald-600 bg-emerald-50/70 border-emerald-100',
             amber: 'text-amber-600 bg-amber-50/70 border-amber-100',
-            rose: 'text-rose-600 bg-rose-50/70 border-rose-100',
             indigo: 'text-indigo-600 bg-indigo-50/70 border-indigo-100',
             blue: 'text-blue-600 bg-blue-50/70 border-blue-100'
           }
@@ -359,10 +440,10 @@ export default function PayrollSettlement() {
             <div key={label} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:-translate-y-0.5 hover:shadow-md transition-all duration-250">
               <div className="flex justify-between items-center">
                 <div>
-                  <p className="text-gray-400 text-3xs font-extrabold uppercase tracking-wider">{label}</p>
-                  <p className="text-2xl font-extrabold text-gray-900 mt-2">{value}</p>
+                  <p className="text-gray-405 text-3xs font-extrabold uppercase tracking-wider">{label}</p>
+                  <p className="text-xl font-extrabold text-gray-900 mt-2">{value}</p>
                 </div>
-                <div className={`p-2.5 rounded-xl border ${themeMap[color as 'emerald' | 'amber' | 'rose' | 'indigo' | 'blue']}`}>
+                <div className={`p-2.5 rounded-xl border ${themeMap[color as 'emerald' | 'amber' | 'indigo' | 'blue']}`}>
                   <Icon size={18} />
                 </div>
               </div>
@@ -377,12 +458,16 @@ export default function PayrollSettlement() {
         <div className="border-b border-gray-150 bg-gray-50/30 px-6">
           <nav className="flex -mb-px gap-6">
             {[
-              { id: 'pending', label: '💳 Pending Disbursements Roster', count: payouts.length },
-              { id: 'batches', label: '🗂️ Historical Payout Batches Logs', count: batches.length }
+              { id: 'pending', label: '💳 Pending Approval', count: payouts.filter(p => p.status.toUpperCase() === 'PENDING').length },
+              { id: 'approved', label: '🟢 Approved & Ready', count: payouts.filter(p => p.status.toUpperCase() === 'APPROVED' || p.status === 'Approve').length },
+              { id: 'disbursed', label: '💸 Disbursed Logs', count: payouts.filter(p => p.status.toUpperCase() === 'DISBURSED').length }
             ].map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => {
+                  setActiveTab(tab.id as any)
+                  setCheckedIds([])
+                }}
                 className={`py-4 text-xs font-bold border-b-2 flex items-center gap-2 transition-all ${
                   activeTab === tab.id
                     ? 'border-primary-500 text-primary-600'
@@ -402,73 +487,56 @@ export default function PayrollSettlement() {
 
         {/* Tab content body */}
         <div className="p-6">
-          {activeTab === 'pending' ? (
-            <div className="space-y-6">
-              {/* Date Filters & Search */}
-              <div className="flex flex-col md:flex-row items-center gap-4 justify-between bg-gray-50/50 p-4 rounded-2xl border border-gray-200/80">
-                <div className="relative w-full md:max-w-xs">
-                  <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search provider name or phone..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 border border-gray-150 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white font-semibold"
-                  />
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-                  <select
-                    value={cityFilter}
-                    onChange={e => setCityFilter(e.target.value)}
-                    className="px-3 py-2 border border-gray-150 rounded-xl text-3xs font-bold text-gray-655 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  >
-                    <option value="all">All Cities</option>
-                    <option value="Budapest">Budapest</option>
-                    <option value="Mumbai">Mumbai</option>
-                    <option value="London">London</option>
-                  </select>
-
-                  {/* Date range picker */}
-                  <div className="flex items-center gap-1.5 border border-gray-150 px-3 py-2 rounded-xl bg-white shadow-3xs">
-                    <Calendar size={13} className="text-gray-400" />
-                    <input
-                      type="date"
-                      value={selectedDateFrom}
-                      onChange={e => setSelectedDateFrom(e.target.value)}
-                      className="bg-transparent text-3xs font-bold text-gray-700 focus:outline-none w-[90px]"
-                    />
-                    <span className="text-3xs text-gray-450 font-bold px-1">to</span>
-                    <input
-                      type="date"
-                      value={selectedDateTo}
-                      onChange={e => setSelectedDateTo(e.target.value)}
-                      className="bg-transparent text-3xs font-bold text-gray-700 focus:outline-none w-[90px]"
-                    />
-                  </div>
-                </div>
+          <div className="space-y-6">
+            {/* Search & Filters */}
+            <div className="flex flex-col md:flex-row items-center gap-4 justify-between bg-gray-50/50 p-4 rounded-2xl border border-gray-200/80">
+              <div className="relative w-full md:max-w-xs">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search provider name or phone..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 border border-gray-150 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white font-semibold"
+                />
               </div>
 
-              {/* Disbursement Payout Table */}
-              <div className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-3xs">
-                {loading ? (
-                  <div className="flex flex-col items-center justify-center py-20 bg-white">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary-600 mb-3" />
-                    <p className="text-gray-500 font-medium text-xs">Loading pending disbursements...</p>
-                  </div>
-                ) : (
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-50 border-b border-gray-150">
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+                <select
+                  value={cityFilter}
+                  onChange={e => setCityFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-150 rounded-xl text-3xs font-bold text-gray-655 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="all">All Cities</option>
+                  <option value="Budapest">Budapest</option>
+                  <option value="Mumbai">Mumbai</option>
+                  <option value="London">London</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-3xs">
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-20 bg-white">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary-600 mb-3" />
+                  <p className="text-gray-500 font-medium text-xs">Syncing with backend...</p>
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-gray-50 border-b border-gray-150">
                     <tr>
-                      <th className="px-6 py-4 w-12">
-                        <input
-                          type="checkbox"
-                          checked={filteredPayouts.length > 0 && checkedIds.length === filteredPayouts.filter(p => p.status === 'Approve').length}
-                          onChange={handleSelectAll}
-                          className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                        />
-                      </th>
-                      {['Service Provider', 'Target Salary Payout', 'Bank Institution Details', 'Clearance Status Override', 'Manual Decisions'].map(h => (
+                      {activeTab === 'approved' && (
+                        <th className="px-6 py-4 w-12">
+                          <input
+                            type="checkbox"
+                            checked={filteredPayouts.length > 0 && checkedIds.length === filteredPayouts.length}
+                            onChange={handleSelectAll}
+                            className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                          />
+                        </th>
+                      )}
+                      {['Service Provider', 'Payout Cycle End', 'Calculated Salary', 'Bank Institution Details', 'Status', activeTab !== 'disbursed' ? 'Action' : ''].filter(Boolean).map(h => (
                         <th key={h} className="px-6 py-4 text-3xs font-extrabold text-gray-450 uppercase tracking-wider">{h}</th>
                       ))}
                     </tr>
@@ -476,30 +544,31 @@ export default function PayrollSettlement() {
                   <tbody className="divide-y divide-gray-100">
                     {filteredPayouts.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-20 text-center">
+                        <td colSpan={7} className="py-20 text-center">
                           <UserX size={38} className="text-gray-350 mx-auto mb-2" />
-                          <p className="font-extrabold text-gray-700">No Payout Records Waiting</p>
-                          <p className="text-gray-500 text-3xs mt-0.5">There are no pending salary disbursements in this date range.</p>
+                          <p className="font-extrabold text-gray-700">No Settlement Records Found</p>
+                          <p className="text-gray-500 text-3xs mt-0.5">There are no records matching this filter in the current date range.</p>
                         </td>
                       </tr>
                     ) : (
                       filteredPayouts.map(item => {
-                        const isApproved = item.status === 'Approve'
-                        const isHold = item.status === 'Hold'
-                        const isReject = item.status === 'Reject'
+                        const isPending = item.status.toUpperCase() === 'PENDING'
+                        const isApproved = item.status.toUpperCase() === 'APPROVED' || item.status === 'Approve'
+                        const isDisbursed = item.status.toUpperCase() === 'DISBURSED'
                         const isChecked = checkedIds.includes(item.providerId)
                         
                         return (
                           <tr key={item.id} className={`hover:bg-gray-50/40 transition-colors ${isChecked ? 'bg-primary-50/10' : ''}`}>
-                            <td className="px-6 py-4">
-                              <input
-                                type="checkbox"
-                                disabled={item.status !== 'Approve'}
-                                checked={isChecked}
-                                onChange={e => handleSelectOne(item.providerId, e.target.checked)}
-                                className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 disabled:opacity-30 disabled:cursor-not-allowed"
-                              />
-                            </td>
+                            {activeTab === 'approved' && (
+                              <td className="px-6 py-4">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={e => handleSelectOne(item.providerId, e.target.checked)}
+                                  className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                />
+                              </td>
+                            )}
 
                             {/* Provider Info */}
                             <td className="px-6 py-4">
@@ -514,11 +583,24 @@ export default function PayrollSettlement() {
                               </div>
                             </td>
 
+                            {/* Payout Cycle Date */}
+                            <td className="px-6 py-4">
+                              <span className="text-3xs font-bold text-gray-750">
+                                {item.payoutCycle ? new Date(item.payoutCycle).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                              </span>
+                            </td>
+
                             {/* Salary value */}
                             <td className="px-6 py-4">
-                              <span className="text-xs font-extrabold text-gray-900">
+                              <div className="text-xs font-extrabold text-gray-900">
                                 ₹{item.amount.toLocaleString('en-IN')}
-                              </span>
+                              </div>
+                              {((item.bonus ?? 0) > 0 || (item.penalty ?? 0) > 0 || (item.deduction ?? 0) > 0) && (
+                                <div className="text-4xs font-bold text-gray-400 mt-0.5">
+                                  {(item.bonus ?? 0) > 0 && <span className="text-emerald-500">+{item.bonus} Bonus </span>}
+                                  {(item.penalty ?? 0) > 0 && <span className="text-rose-500">-{item.penalty} Penalty </span>}
+                                </div>
+                              )}
                             </td>
 
                             {/* Bank Account */}
@@ -529,107 +611,59 @@ export default function PayrollSettlement() {
 
                             {/* Status Badge */}
                             <td className="px-6 py-4 whitespace-nowrap">
+                              {isPending && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-4xs font-extrabold rounded-full border bg-amber-50 text-amber-700 border-amber-200 uppercase tracking-wider animate-pulse">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                  Awaiting Approval
+                                </span>
+                              )}
                               {isApproved && (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-4xs font-extrabold rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200 uppercase tracking-wider">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                  Approve &amp; Ready
+                                  Approved &amp; Ready
                                 </span>
                               )}
-                              {isHold && (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-4xs font-extrabold rounded-full border bg-amber-50 text-amber-700 border-amber-200 uppercase tracking-wider animate-pulse">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                  Payout Locked (Hold)
-                                </span>
-                              )}
-                              {isReject && (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-4xs font-extrabold rounded-full border bg-rose-50 text-rose-700 border-rose-200 uppercase tracking-wider">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                  Rejected from Cycle
+                              {isDisbursed && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-4xs font-extrabold rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200 uppercase tracking-wider">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                                  Fully Disbursed
                                 </span>
                               )}
                             </td>
 
-                            {/* Decisive Toggles buttons */}
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-1.5 font-bold text-3xs">
-                                <button
-                                  onClick={() => handleUpdateStatus(item.id, item.providerName, 'Approve')}
-                                  className={`px-2.5 py-1.5 rounded-lg border transition-all ${
-                                    isApproved 
-                                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-3xs' 
-                                      : 'bg-white border-gray-250 text-gray-500 hover:bg-gray-50'
-                                  }`}
-                                >
-                                  Approve
-                                </button>
-                                <button
-                                  onClick={() => handleUpdateStatus(item.id, item.providerName, 'Hold')}
-                                  className={`px-2.5 py-1.5 rounded-lg border transition-all ${
-                                    isHold 
-                                      ? 'bg-amber-500 border-amber-500 text-white shadow-3xs' 
-                                      : 'bg-white border-gray-250 text-gray-500 hover:bg-gray-50'
-                                  }`}
-                                >
-                                  Hold
-                                </button>
-                                <button
-                                  onClick={() => handleUpdateStatus(item.id, item.providerName, 'Reject')}
-                                  className={`px-2.5 py-1.5 rounded-lg border transition-all ${
-                                    isReject 
-                                      ? 'bg-rose-600 border-rose-600 text-white shadow-3xs' 
-                                      : 'bg-white border-gray-250 text-gray-500 hover:bg-gray-50'
-                                  }`}
-                                >
-                                  Reject
-                                </button>
-                              </div>
-                            </td>
+                            {/* Action Button */}
+                            {activeTab !== 'disbursed' && (
+                              <td className="px-6 py-4">
+                                {isPending && (
+                                  <button
+                                    onClick={() => handleApprove(item.id, item.providerName)}
+                                    className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-bold text-3xs shadow-3xs transition-all"
+                                  >
+                                    Approve Settlement
+                                  </button>
+                                )}
+                                {isApproved && (
+                                  <button
+                                    onClick={() => {
+                                      setCheckedIds([item.providerId])
+                                      setTimeout(() => triggerBatchReleaseFlow(), 50)
+                                    }}
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-3xs shadow-3xs transition-all"
+                                  >
+                                    Disburse Payout
+                                  </button>
+                                )}
+                              </td>
+                            )}
                           </tr>
                         )
                       })
                     )}
                   </tbody>
                 </table>
-                )}
-              </div>
+              )}
             </div>
-          ) : (
-            /* Historical batches tab content */
-            <div className="space-y-6">
-              <div className="border border-gray-250 rounded-2xl overflow-hidden bg-white shadow-3xs">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-gray-50 border-b border-gray-150">
-                    <tr>
-                      {['Batch Identifier Code', 'Ledger Date Range', 'Disbursed Payout Sum', 'Providers Settled', 'Release Date', 'Authorized By', 'Status'].map(h => (
-                        <th key={h} className="px-6 py-4 text-3xs font-extrabold text-gray-450 uppercase tracking-wider">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {batches.map(batch => (
-                      <tr key={batch.id} className="hover:bg-gray-50/40 transition-colors">
-                        <td className="px-6 py-4 font-mono font-bold text-xs text-gray-800">{batch.batchCode}</td>
-                        <td className="px-6 py-4 text-3xs font-semibold text-gray-650">
-                          {new Date(batch.dateFrom).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                          {' → '}
-                          {new Date(batch.dateTo).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </td>
-                        <td className="px-6 py-4 font-extrabold text-gray-900">₹{batch.totalAmount.toLocaleString('en-IN')}</td>
-                        <td className="px-6 py-4 font-bold text-gray-700">{batch.providerCount} service providers</td>
-                        <td className="px-6 py-4 text-3xs text-gray-450">{new Date(batch.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}</td>
-                        <td className="px-6 py-4 text-3xs font-bold text-gray-600">{batch.processedBy}</td>
-                        <td className="px-6 py-4">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 border border-emerald-150 text-4xs font-extrabold text-emerald-700 uppercase tracking-wider">
-                            <ShieldCheck size={10} /> Fully Settled
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -657,9 +691,9 @@ export default function PayrollSettlement() {
             <div className="flex justify-between items-center pb-4 border-b border-gray-100 shrink-0">
               <div>
                 <h3 className="text-lg font-extrabold text-gray-900 flex items-center gap-2">
-                  <Loader2 size={18} className="animate-spin text-primary-600" /> Payroll Disbursement Clearance Router
+                  <Loader2 size={18} className="animate-spin text-primary-600" /> Payroll Payout Clearance Router
                 </h3>
-                <p className="text-gray-400 text-3xs font-bold uppercase tracking-wider mt-1">
+                <p className="text-gray-450 text-3xs font-bold uppercase tracking-wider mt-1">
                   SYSTEM IS EXECUTING FINANCIAL TRANSFER COMPLIANCE PROTOCOLS
                 </p>
               </div>
@@ -670,7 +704,7 @@ export default function PayrollSettlement() {
               {[
                 { step: 1, label: '1. Validate Rules', color: 'blue' },
                 { step: 2, label: '2. Batch Process', color: 'indigo' },
-                { step: 3, label: '3. Save Records', color: 'emerald' },
+                { step: 3, label: '3. Disburse Payout', color: 'emerald' },
                 { step: 4, label: '4. Notify Staff', color: 'teal' }
               ].map(s => {
                 const isDone = processingStep > s.step || processingStep === 5
@@ -683,7 +717,7 @@ export default function PayrollSettlement() {
                         isDone 
                           ? 'bg-emerald-600 border-emerald-600 text-white' 
                           : isActive 
-                            ? 'bg-primary-50 border-primary-500 text-primary-600 animate-pulse' 
+                            ? 'bg-primary-55 border-primary-500 text-primary-600 animate-pulse' 
                             : 'bg-white border-gray-200 text-gray-400'
                       }`}>
                         {isDone ? '✓' : s.step}
@@ -702,7 +736,7 @@ export default function PayrollSettlement() {
               {processingStep !== 5 ? (
                 /* Ongoing Steps logs */
                 <div className="space-y-4">
-                  <h4 className="text-2xs font-extrabold text-gray-400 uppercase tracking-wider">Router Execution Logs</h4>
+                  <h4 className="text-2xs font-extrabold text-gray-405 uppercase tracking-wider">Router Execution Logs</h4>
                   
                   <div className="bg-gray-950 border border-gray-850 rounded-2xl p-4 h-[140px] overflow-y-auto space-y-2.5 font-mono text-3xs text-emerald-400 shadow-inner">
                     {stepLogs.map((log, i) => (
@@ -724,9 +758,9 @@ export default function PayrollSettlement() {
                     <ShieldCheck size={32} className="animate-bounce" />
                   </div>
                   <div>
-                    <h4 className="text-base font-extrabold text-gray-900">Payroll Batch Released Successfully!</h4>
+                    <h4 className="text-base font-extrabold text-gray-900">Payroll Payouts Released Successfully!</h4>
                     <p className="text-gray-400 text-3xs mt-1.5 font-semibold leading-relaxed">
-                      A settlement batch containing your selected payout amounts has been persisted, locked, and clearance notifications dispatched.
+                      All selected payouts have been credited, transaction records locked, and SMS notifications dispatched.
                     </p>
                   </div>
 

@@ -1003,9 +1003,13 @@ export interface PayoutSettlementItem {
   bankName: string
   accountNumber: string
   ifscCode: string
-  status: 'Approve' | 'Hold' | 'Reject'
+  status: string
   city?: string
   ledgerDate: string
+  payoutCycle?: string | Date
+  bonus?: number
+  penalty?: number
+  deduction?: number
 }
 
 export interface SettlementBatch {
@@ -1129,9 +1133,14 @@ const PRESET_SETTLEMENT_BATCHES: SettlementBatch[] = [
   }
 ]
 
-export async function fetchPayoutSettlements(params?: { dateFrom?: string; dateTo?: string }): Promise<PayoutSettlementItem[]> {
+export async function fetchPayoutSettlements(params?: { dateFrom?: string; dateTo?: string; status?: string }): Promise<PayoutSettlementItem[]> {
   try {
-    const res = await apiClient.get<any>('/admin/payroll-settlements', params)
+    const queryParams: any = {}
+    if (params?.dateFrom) queryParams.startDate = params.dateFrom
+    if (params?.dateTo) queryParams.endDate = params.dateTo
+    if (params?.status) queryParams.status = params.status
+
+    const res = await apiClient.get<any>('/admin/payroll/settlements', queryParams)
     if (res.success && Array.isArray(res.data)) {
       return res.data
     }
@@ -1142,11 +1151,56 @@ export async function fetchPayoutSettlements(params?: { dateFrom?: string; dateT
   if (!memoryPayoutsStore) {
     memoryPayoutsStore = [...PRESET_PAYOUT_SETTLEMENTS]
   }
-  return memoryPayoutsStore
+
+  // Filter local mock store for dev fallback compatibility
+  return memoryPayoutsStore.filter(item => {
+    if (params?.status) {
+      // Map frontend tab statuses to mock database status values
+      const mappedStatus = params.status === 'Approve' ? 'APPROVED' : params.status === 'Hold' ? 'HOLD' : params.status === 'Reject' ? 'REJECTED' : params.status;
+      if (item.status.toUpperCase() !== mappedStatus.toUpperCase()) return false;
+    }
+    return true;
+  })
+}
+
+export async function generatePayrollSettlements(startDate: string, endDate: string): Promise<any> {
+  const res = await apiClient.post<any>('/admin/payroll/settlements', { startDate, endDate })
+  if (!res.success) {
+    throw new Error(res.error?.message || 'Failed to generate payroll settlements')
+  }
+  return res.data
+}
+
+export async function approvePayrollSettlement(id: string): Promise<any> {
+  const res = await apiClient.patch<any>(`/admin/payroll/settlement/${id}/approve`)
+  if (!res.success) {
+    throw new Error(res.error?.message || 'Failed to approve payroll settlement')
+  }
+  if (memoryPayoutsStore) {
+    memoryPayoutsStore = memoryPayoutsStore.map(item => item.id === id ? { ...item, status: 'Approve' } : item)
+  }
+  return res.data
+}
+
+export async function disbursePayrollSettlement(id: string): Promise<any> {
+  const res = await apiClient.post<any>(`/admin/payroll/settlement/${id}/disburse`)
+  if (!res.success) {
+    throw new Error(res.error?.message || 'Failed to disburse payroll settlement')
+  }
+  if (memoryPayoutsStore) {
+    memoryPayoutsStore = memoryPayoutsStore.filter(item => item.id !== id)
+  }
+  return res.data
 }
 
 export async function updatePayoutSettlementStatus(id: string, status: 'Approve' | 'Hold' | 'Reject'): Promise<PayoutSettlementItem> {
   try {
+    if (status === 'Approve') {
+      await approvePayrollSettlement(id)
+      return { id, status } as any
+    }
+    
+    // Fallback/Mock for Hold/Reject local overrides
     const res = await apiClient.patch<PayoutSettlementItem>(`/admin/payroll-settlements/${id}/status`, { status })
     if (res.success && res.data) {
       if (memoryPayoutsStore) {
