@@ -22,7 +22,7 @@ import {
   TrendingDown
 } from 'lucide-react'
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
-import { fetchSalaryLedger, updateSalaryLedger, type DailySalaryLedger } from '../services/gyorsApi'
+import { fetchSalaryLedger, updateSalaryLedger, runSalaryCalculationRoutine, type DailySalaryLedger } from '../services/gyorsApi'
 import { exportToCSV, exportToPDF, formatAmountPlain } from '../utils/exportUtils'
 
 // HSL styles for ledger status
@@ -107,6 +107,7 @@ export default function SalaryLedger() {
   const [loading, setLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [bulkSuccess, setBulkSuccess] = useState<string | null>(null)
+  const [runningRoutine, setRunningRoutine] = useState(false)
 
   // Filters & State
   const [selectedDateFrom, setSelectedDateFrom] = useState<string>(
@@ -240,6 +241,29 @@ export default function SalaryLedger() {
     }
   }
 
+  const handleRunCalculationRoutine = async () => {
+    setRunningRoutine(true)
+    try {
+      const dateToRun = selectedDateTo || new Date().toISOString().split('T')[0]
+      const confirmRun = window.confirm(`Are you sure you want to run the Daily Salary Calculation routine for date: ${dateToRun}?`)
+      if (!confirmRun) {
+        setRunningRoutine(false)
+        return
+      }
+
+      const res = await runSalaryCalculationRoutine(dateToRun)
+      setBulkSuccess(`Calculations completed successfully for ${dateToRun}! Processed: ${res.totalProcessed}, Payout: ₹${res.totalPayoutCalculated.toLocaleString('en-IN')}`)
+      setTimeout(() => setBulkSuccess(null), 6000)
+      
+      // Reload ledger data
+      await loadLedgerData()
+    } catch (e: any) {
+      alert(e?.message || 'Failed to run daily calculations routine')
+    } finally {
+      setRunningRoutine(false)
+    }
+  }
+
   // Filter local ledger items
   const filteredLedgers = ledgers.filter(item => {
     const matchesSearch = item.providerName.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -331,6 +355,19 @@ export default function SalaryLedger() {
             className="flex items-center gap-2 bg-white border border-gray-250 px-4 py-2.5 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-sm shrink-0"
           >
             <RefreshCw size={15} /> Refresh Data
+          </button>
+
+          <button
+            onClick={handleRunCalculationRoutine}
+            disabled={runningRoutine}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2.5 rounded-xl shadow-md hover:shadow-indigo-500/10 flex items-center gap-2 text-xs transition-all duration-200 disabled:opacity-50 shrink-0"
+          >
+            {runningRoutine ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Calculator size={15} />
+            )}
+            Run Daily Calculations
           </button>
           
           <button

@@ -816,7 +816,14 @@ export async function updateSalaryLedger(
   return updatedItem
 }
 
+export async function runSalaryCalculationRoutine(date: string): Promise<{ totalProcessed: number; totalPayoutCalculated: number; successCount: number; failedCount: number }> {
+  const res = await apiClient.post<any>('/admin/salary/calculate-routine', { date })
+  if (!res.success) throw new Error(res.error?.message || 'Failed to run salary calculation routine')
+  return res.data
+}
+
 // ─── Incentives & Penalties Rule Configurations ─────────────────────────────────
+
 
 export interface PayrollRule {
   id: string
