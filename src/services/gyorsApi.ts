@@ -339,6 +339,8 @@ export interface ServiceProvider {
   providerProfiles?: { id: string; services: string[]; experiences: string[] }[]
   categories?: { id: string; name: string }[]
   items?: { id: string; name: string }[]
+  teamLeaderId?: string | null
+  teamLeader?: { id: string; name: string; email?: string; phoneNumber?: string } | null
   [key: string]: any
 }
 
@@ -351,6 +353,7 @@ export interface ServiceProviderPayload {
   status?: string
   categoryIds?: string[]
   itemIds?: string[]
+  teamLeaderId?: string | null
 }
 
 export interface ServiceProviderListParams {
@@ -395,6 +398,11 @@ export async function updateServiceProvider(
 export async function updateServiceProviderStatus(id: string, status: string): Promise<void> {
   const res = await apiClient.patch(API_ENDPOINTS.SERVICE_PROVIDERS.UPDATE_STATUS(id), { status })
   if (!res.success) throw new Error(res.error?.message || 'Failed to update status')
+}
+
+export async function assignTeamLeaderToProvider(id: string, teamLeaderId: string | null): Promise<void> {
+  const res = await apiClient.patch(API_ENDPOINTS.SERVICE_PROVIDERS.ASSIGN_TL(id), { teamLeaderId })
+  if (!res.success) throw new Error(res.error?.message || 'Failed to assign team leader')
 }
 
 export async function deleteServiceProvider(id: string): Promise<void> {

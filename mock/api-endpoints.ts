@@ -94,6 +94,7 @@ export const API_ENDPOINTS = {
     CREATE: `${BASE_URL}/admin/service-providers`,
     UPDATE: (id: string) => `${BASE_URL}/admin/service-providers/${id}`,
     UPDATE_STATUS: (id: string) => `${BASE_URL}/admin/service-providers/${id}/status`,
+    ASSIGN_TL: (id: string) => `${BASE_URL}/admin/service-providers/${id}/assign-tl`,
     DELETE: (id: string) => `${BASE_URL}/admin/service-providers/${id}`,
   },
 

@@ -17,6 +17,7 @@ import {
   XCircle,
   Clock,
   ShieldAlert,
+  Crown,
 } from 'lucide-react'
 import {
   fetchServiceProviders,
@@ -27,8 +28,11 @@ import {
   fetchCategories,
   fetchServiceItems,
   fetchBookings,
+  assignTeamLeaderToProvider,
+  fetchUsers,
   type ServiceProvider,
   type ServiceProviderPayload,
+  type AdminUser,
 } from '../services/gyorsApi'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -64,6 +68,7 @@ const emptyForm = (): ServiceProviderPayload => ({
   status: 'PENDING',
   categoryIds: [],
   itemIds: [],
+  teamLeaderId: null,
 })
 
 // ─── Status Dropdown (reusable) ───────────────────────────────────────────────
@@ -162,6 +167,84 @@ function ConfirmDeleteModal({
   )
 }
 
+// ─── Team Leader Dropdown (reusable) ──────────────────────────────────────────
+function TeamLeaderDropdown({
+  current,
+  allTeamLeaders,
+  onChange,
+  loading,
+}: {
+  current?: any
+  allTeamLeaders: AdminUser[]
+  onChange: (tlId: string | null) => void
+  loading?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  return (
+    <div className="relative inline-block" ref={ref}>
+      {loading ? (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-400 border border-gray-100">
+          <Loader2 size={10} className="animate-spin text-gray-400" />
+          Updating...
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-semibold border shadow-sm transition-all hover:scale-105 duration-150 ${
+            current
+              ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300'
+              : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+          }`}
+        >
+          <Crown size={12} className={current ? 'text-indigo-600 fill-indigo-100 animate-pulse' : 'text-gray-400'} />
+          TL: {current ? current.name : 'Unassigned'}
+          <ChevronDown size={10} className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        </button>
+      )}
+
+      {open && (
+        <div className="absolute left-0 mt-1.5 z-40 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden min-w-[210px] max-h-[220px] overflow-y-auto animate-in fade-in-50 slide-in-from-top-1">
+          <div className="px-3.5 py-2 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            Assign Team Leader
+          </div>
+          <button
+            type="button"
+            className="w-full text-left px-3.5 py-2.5 hover:bg-red-50 text-xs text-red-600 font-semibold transition-colors flex items-center gap-2"
+            onClick={() => { onChange(null); setOpen(false) }}
+          >
+            <X size={14} className="text-red-500" />
+            Unassign TL
+          </button>
+          {allTeamLeaders.map((tl) => (
+            <button
+              key={tl.id}
+              type="button"
+              className={`w-full text-left px-3.5 py-2.5 text-xs transition-colors border-t border-gray-50 hover:bg-indigo-50/70 flex flex-col ${
+                current?.id === tl.id ? 'bg-indigo-50 font-bold text-indigo-800' : 'text-gray-700'
+              }`}
+              onClick={() => { onChange(tl.id); setOpen(false) }}
+            >
+              <span>{tl.name}</span>
+              <span className="text-[10px] text-gray-400 font-normal mt-0.5">{tl.phoneNumber || tl.email || 'No contact info'}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Add / Edit Modal ─────────────────────────────────────────────────────────
 
 function ProviderFormModal({
@@ -173,6 +256,7 @@ function ProviderFormModal({
   error,
   allCategories,
   allItems,
+  allTeamLeaders,
 }: {
   mode: 'add' | 'edit'
   initial: ServiceProviderPayload
@@ -182,6 +266,7 @@ function ProviderFormModal({
   error: string | null
   allCategories: { id: string; name: string }[]
   allItems: { id: string; name: string; categoryId: string }[]
+  allTeamLeaders: AdminUser[]
 }) {
   const [form, setForm] = useState<ServiceProviderPayload>(initial)
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(initial.categoryIds || [])
@@ -310,19 +395,36 @@ function ProviderFormModal({
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select
-              value={form.status ?? 'PENDING'}
-              onChange={(e) => set('status', e.target.value)}
-              className={inputCls}
-            >
-              {STATUS_OPTIONS.map((s) => (
-                <option key={s} value={s}>
-                  {s.charAt(0) + s.slice(1).toLowerCase()}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select
+                value={form.status ?? 'PENDING'}
+                onChange={(e) => set('status', e.target.value)}
+                className={inputCls}
+              >
+                {STATUS_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {s.charAt(0) + s.slice(1).toLowerCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Team Leader</label>
+              <select
+                value={form.teamLeaderId ?? ''}
+                onChange={(e) => set('teamLeaderId', e.target.value || null)}
+                className={inputCls}
+              >
+                <option value="">Unassigned</option>
+                {allTeamLeaders.map((tl) => (
+                  <option key={tl.id} value={tl.id}>
+                    {tl.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="border-t border-gray-100 pt-4 mt-6">
@@ -525,9 +627,13 @@ export default function ServiceProviderManagement() {
   // Master Data
   const [allCategories, setAllCategories] = useState<{ id: string; name: string }[]>([])
   const [allItems, setAllItems] = useState<{ id: string; name: string; categoryId: string }[]>([])
+  const [allTeamLeaders, setAllTeamLeaders] = useState<AdminUser[]>([])
 
   // Status change loading map
   const [statusLoading, setStatusLoading] = useState<Record<string, boolean>>({})
+
+  // TL assignment loading map
+  const [tlLoading, setTlLoading] = useState<Record<string, boolean>>({})
 
   // Toast
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
@@ -556,9 +662,14 @@ export default function ServiceProviderManagement() {
 
   const loadMasterData = async () => {
     try {
-      const [cats, items] = await Promise.all([fetchCategories(), fetchServiceItems()])
+      const [cats, items, users] = await Promise.all([
+        fetchCategories(),
+        fetchServiceItems(),
+        fetchUsers({ role: 'TEAM_LEADER' }),
+      ])
       setAllCategories(cats)
       setAllItems(items)
+      setAllTeamLeaders(users)
     } catch (e) {
       console.error('Failed to load metadata:', e)
     }
@@ -606,6 +717,34 @@ export default function ServiceProviderManagement() {
       showToast(e instanceof Error ? e.message : 'Failed to update status', 'error')
     } finally {
       setStatusLoading((prev) => ({ ...prev, [provider.id]: false }))
+    }
+  }
+
+  const handleTlAssign = async (provider: ServiceProvider, tlId: string | null) => {
+    setTlLoading((prev) => ({ ...prev, [provider.id]: true }))
+    try {
+      await assignTeamLeaderToProvider(provider.id, tlId)
+      const selectedTl = allTeamLeaders.find((t) => t.id === tlId) || null
+      setProviders((prev) =>
+        prev.map((p) =>
+          p.id === provider.id
+            ? {
+                ...p,
+                teamLeaderId: tlId,
+                teamLeader: selectedTl ? { id: selectedTl.id, name: selectedTl.name, phoneNumber: selectedTl.phoneNumber, email: selectedTl.email } : null,
+              }
+            : p
+        )
+      )
+      showToast(
+        tlId
+          ? `Team Leader ${selectedTl?.name} assigned to ${provider.name}`
+          : `Team Leader unassigned from ${provider.name}`
+      )
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Failed to assign Team Leader', 'error')
+    } finally {
+      setTlLoading((prev) => ({ ...prev, [provider.id]: false }))
     }
   }
 
@@ -815,9 +954,17 @@ export default function ServiceProviderManagement() {
                               {provider.name?.charAt(0)?.toUpperCase() ?? '?'}
                             </span>
                           </div>
-                          <div>
+                          <div className="flex flex-col">
                             <p className="text-sm font-semibold text-gray-900">{provider.name}</p>
                             <p className="text-xs text-gray-400 font-mono">{provider.id.slice(0, 10)}…</p>
+                            <div className="mt-1.5">
+                              <TeamLeaderDropdown
+                                current={provider.teamLeader}
+                                allTeamLeaders={allTeamLeaders}
+                                onChange={(tlId) => handleTlAssign(provider, tlId)}
+                                loading={tlLoading[provider.id]}
+                              />
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -924,6 +1071,7 @@ export default function ServiceProviderManagement() {
                 status: editTarget.status ?? 'PENDING',
                 categoryIds: editTarget.categories?.map((c: any) => c.id) || [],
                 itemIds: editTarget.items?.map((i: any) => i.id) || [],
+                teamLeaderId: editTarget.teamLeaderId ?? '',
               }
               : emptyForm()
           }
@@ -933,6 +1081,7 @@ export default function ServiceProviderManagement() {
           error={formError}
           allCategories={allCategories}
           allItems={allItems}
+          allTeamLeaders={allTeamLeaders}
         />
       )}
 
