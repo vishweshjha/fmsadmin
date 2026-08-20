@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Search, Filter, MoreVertical, Ban, CheckCircle, Eye, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
-import { fetchUsers, updateUserStatus, type AdminUser } from '../services/gyorsApi'
+import { fetchUsers, updateUserStatus, updateUserRole, type AdminUser } from '../services/gyorsApi'
 
 export default function UserManagement() {
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -44,6 +44,18 @@ export default function UserManagement() {
     }
   }
 
+  const handleRoleChange = async (user: AdminUser, newRole: 'CUSTOMER' | 'PROVIDER' | 'TEAM_LEADER' | 'ADMIN') => {
+    setActionLoading(user.id)
+    try {
+      await updateUserRole(user.id, newRole)
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, role: newRole } : u))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update role')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   const getStatusDisplay = (status: string) => {
     const s = status?.toLowerCase() || ''
     if (s === 'active') return { label: 'Active', cls: 'bg-green-100 text-green-800' }
@@ -55,7 +67,7 @@ export default function UserManagement() {
   const getRoleDisplay = (role: string) => {
     const map: Record<string, string> = {
       CUSTOMER: 'Customer', PROVIDER: 'Provider', SERVICE_PROVIDER: 'Provider',
-      ADMIN: 'Admin', SUPER_ADMIN: 'Super Admin',
+      TEAM_LEADER: 'Team Leader', ADMIN: 'Admin', SUPER_ADMIN: 'Super Admin',
     }
     return map[role?.toUpperCase()] || role || 'Unknown'
   }
@@ -106,6 +118,7 @@ export default function UserManagement() {
             <option value="all">All Roles</option>
             <option value="Customer">Customer</option>
             <option value="Provider">Provider</option>
+            <option value="Team Leader">Team Leader</option>
             <option value="Admin">Admin</option>
           </select>
           <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
@@ -172,9 +185,23 @@ export default function UserManagement() {
                         <div className="text-xs text-gray-500">{user.email || '—'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                          {getRoleDisplay(user.role)}
-                        </span>
+                        {user.role === 'SUPER_ADMIN' ? (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                            Super Admin
+                          </span>
+                        ) : (
+                          <select
+                            value={user.role}
+                            onChange={(e) => handleRoleChange(user, e.target.value as any)}
+                            disabled={actionLoading === user.id}
+                            className="bg-blue-50 border border-blue-200 text-blue-800 text-xs font-semibold rounded-full px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer disabled:opacity-50"
+                          >
+                            <option value="CUSTOMER">Customer</option>
+                            <option value="PROVIDER">Provider</option>
+                            <option value="TEAM_LEADER">Team Leader</option>
+                            <option value="ADMIN">Admin</option>
+                          </select>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${status.cls}`}>{status.label}</span>

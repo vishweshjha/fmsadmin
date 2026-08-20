@@ -78,6 +78,14 @@ export async function updateUserStatus(
   if (!res.success) throw new Error(res.error?.message || 'Failed to update user status')
 }
 
+export async function updateUserRole(
+  id: string,
+  role: 'CUSTOMER' | 'PROVIDER' | 'TEAM_LEADER' | 'ADMIN'
+): Promise<void> {
+  const res = await apiClient.patch(API_ENDPOINTS.USERS.UPDATE_ROLE(id), { role })
+  if (!res.success) throw new Error(res.error?.message || 'Failed to update user role')
+}
+
 export async function fetchUserHistory(id: string): Promise<any[]> {
   const res = await apiClient.get<any[]>(API_ENDPOINTS.USERS.ACTIVITY_HISTORY(id))
   if (!res.success) throw new Error(res.error?.message || 'Failed to load user history')

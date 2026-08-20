@@ -23,6 +23,7 @@ export const API_ENDPOINTS = {
     LIST: `${BASE_URL}/admin/users`,
     DETAIL: (id: string) => `${BASE_URL}/admin/users/${id}`,
     UPDATE_STATUS: (id: string) => `${BASE_URL}/admin/users/${id}/status`,
+    UPDATE_ROLE: (id: string) => `${BASE_URL}/admin/users/${id}/role`,
     ACTIVITY_HISTORY: (id: string) => `${BASE_URL}/admin/users/${id}/history`,
     EXPORT: `${BASE_URL}/admin/users/export`,
   },
