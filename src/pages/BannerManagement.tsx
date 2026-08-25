@@ -469,34 +469,98 @@ export default function BannerManagement() {
                 </div>
               </div>
 
-              {/* Image URL Picker */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-700">Banner Image URL *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.imageUrl}
-                  onChange={(e) => setFormData(prev => ({ ...prev, imageUrl: e.target.value }))}
-                  placeholder="https://images.unsplash.com/..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
-                />
-                
-                {/* Suggestions quick selector */}
-                <div className="flex flex-wrap gap-2 pt-1.5">
-                  {defaultImages.map((img) => (
-                    <button
-                      key={img.label}
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, imageUrl: img.url }))}
-                      className={`px-2.5 py-1 text-xs rounded-lg border font-medium transition ${
-                        formData.imageUrl === img.url
-                          ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                          : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      {img.label}
-                    </button>
-                  ))}
+              {/* Image Upload / URL Picker */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-700 block">Banner Photo</label>
+                <div className="flex gap-4 items-center">
+                  {formData.imageUrl ? (
+                    <div className="relative w-24 h-24 rounded-xl border border-gray-200 overflow-hidden group">
+                      <img src={formData.imageUrl} className="w-full h-full object-cover" alt="Preview" />
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, imageUrl: '' }))}
+                        className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity font-medium text-xs"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-200 hover:border-indigo-400 cursor-pointer flex flex-col items-center justify-center text-gray-400 transition-colors bg-gray-50">
+                      <Plus size={20} className="text-indigo-600" />
+                      <span className="text-[10px] font-semibold mt-1">Upload</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.readAsDataURL(file);
+                            reader.onload = (event) => {
+                              const img = new Image();
+                              img.src = event.target?.result as string;
+                              img.onload = () => {
+                                const canvas = document.createElement('canvas');
+                                const MAX_WIDTH = 800;
+                                const MAX_HEIGHT = 600;
+                                let width = img.width;
+                                let height = img.height;
+
+                                if (width > height) {
+                                  if (width > MAX_WIDTH) {
+                                    height *= MAX_WIDTH / width;
+                                    width = MAX_WIDTH;
+                                  }
+                                } else {
+                                  if (height > MAX_HEIGHT) {
+                                    width *= MAX_HEIGHT / height;
+                                    height = MAX_HEIGHT;
+                                  }
+                                }
+
+                                canvas.width = width;
+                                canvas.height = height;
+                                const ctx = canvas.getContext('2d');
+                                ctx?.drawImage(img, 0, 0, width, height);
+
+                                // Compress to 70% quality JPEG
+                                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                                setFormData(prev => ({ ...prev, imageUrl: compressedDataUrl }));
+                              };
+                            };
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                  <div className="flex-1 space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Or paste an Image URL here..."
+                      value={formData.imageUrl}
+                      onChange={(e) => setFormData(prev => ({ ...prev, imageUrl: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-xs"
+                    />
+                    
+                    {/* Suggestions quick selector */}
+                    <div className="flex flex-wrap gap-2">
+                      {defaultImages.map((img) => (
+                        <button
+                          key={img.label}
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, imageUrl: img.url }))}
+                          className={`px-2.5 py-1 text-xs rounded-lg border font-medium transition ${
+                            formData.imageUrl === img.url
+                              ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                              : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                          }`}
+                        >
+                          {img.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
