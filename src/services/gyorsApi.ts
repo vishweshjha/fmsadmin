@@ -1374,7 +1374,47 @@ export async function createPayrollReport(report: Omit<PayrollReportRecord, 'id'
   return newReport
 }
 
+// ─── Banners ──────────────────────────────────────────────────────────────────
 
+export interface Banner {
+  id: string
+  title: string
+  subtitle?: string
+  imageUrl: string
+  redirectType: 'NONE' | 'CATEGORY' | 'SERVICE'
+  redirectId?: string
+  startDate: string
+  endDate: string
+  isActive: boolean
+  createdAt?: string
+  updatedAt?: string
+}
 
+export async function fetchBanners(): Promise<Banner[]> {
+  const res = await apiClient.get<Banner[]>(API_ENDPOINTS.BANNERS.LIST)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to load banners')
+  return res.data || []
+}
 
+export async function createBanner(banner: Omit<Banner, 'id'>): Promise<Banner> {
+  const res = await apiClient.post<Banner>(API_ENDPOINTS.BANNERS.CREATE, banner)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to create banner')
+  return res.data!
+}
 
+export async function updateBanner(id: string, banner: Partial<Banner>): Promise<Banner> {
+  const res = await apiClient.put<Banner>(API_ENDPOINTS.BANNERS.UPDATE(id), banner)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to update banner')
+  return res.data!
+}
+
+export async function toggleBannerStatus(id: string, isActive: boolean): Promise<Banner> {
+  const res = await apiClient.patch<Banner>(API_ENDPOINTS.BANNERS.TOGGLE(id), { isActive })
+  if (!res.success) throw new Error(res.error?.message || 'Failed to update banner status')
+  return res.data!
+}
+
+export async function deleteBanner(id: string): Promise<void> {
+  const res = await apiClient.delete(API_ENDPOINTS.BANNERS.DELETE(id))
+  if (!res.success) throw new Error(res.error?.message || 'Failed to delete banner')
+}

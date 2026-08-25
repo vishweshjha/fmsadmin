@@ -17,6 +17,7 @@ import AuditLogging from './pages/AuditLogging'
 import ServiceProviderManagement from './pages/ServiceProviderManagement'
 import ServiceManagement from './pages/ServiceManagement'
 import CouponManagement from './pages/CouponManagement'
+import BannerManagement from './pages/BannerManagement'
 import ShiftConfiguration from './pages/ShiftConfiguration'
 import ShiftAssignmentManagement from './pages/ShiftAssignmentManagement'
 import AttendanceManagement from './pages/AttendanceManagement'
@@ -42,6 +43,7 @@ const rolePermissions: Record<string, UserRole[]> = {
   '/payroll-reports': ['Super Admin', 'Finance Admin'],
   '/analytics': ['Super Admin', 'Operations Admin', 'Finance Admin'],
   '/coupons': ['Super Admin', 'Operations Admin', 'Admin'],
+  '/banners': ['Super Admin', 'Operations Admin', 'Admin'],
   '/shifts': ['Super Admin', 'Operations Admin', 'Admin'],
   '/shifts/assignments': ['Super Admin', 'Operations Admin', 'Admin'],
   '/attendance': ['Super Admin', 'Operations Admin', 'Admin'],
@@ -215,6 +217,16 @@ function AppRoutes() {
           <ProtectedRoute requiredRoles={rolePermissions['/coupons']}>
             <Layout>
               <CouponManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/banners"
+        element={
+          <ProtectedRoute requiredRoles={rolePermissions['/banners']}>
+            <Layout>
+              <BannerManagement />
             </Layout>
           </ProtectedRoute>
         }

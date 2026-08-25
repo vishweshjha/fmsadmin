@@ -128,6 +128,17 @@ export const API_ENDPOINTS = {
     ADJUST: (id: string) => `${BASE_URL}/admin/attendance/${id}/adjust`,
     GPS_LOGS: (providerId: string) => `${BASE_URL}/admin/attendance/providers/${providerId}/gps`,
   },
+
+  // Admin - Banners
+  BANNERS: {
+    CREATE: `${BASE_URL}/banners`,
+    LIST: `${BASE_URL}/banners`,
+    DETAIL: (id: string) => `${BASE_URL}/banners/${id}`,
+    UPDATE: (id: string) => `${BASE_URL}/banners/${id}`,
+    DELETE: (id: string) => `${BASE_URL}/banners/${id}`,
+    TOGGLE: (id: string) => `${BASE_URL}/banners/${id}/status`,
+    ACTIVE: `${BASE_URL}/banners/active`,
+  },
 } as const
 
 export default API_ENDPOINTS
