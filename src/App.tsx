@@ -25,6 +25,7 @@ import SalaryLedger from './pages/SalaryLedger'
 import IncentivesPenalties from './pages/IncentivesPenalties'
 import PayrollSettlement from './pages/PayrollSettlement'
 import PayrollReports from './pages/PayrollReports'
+import ServiceabilityManagement from './pages/ServiceabilityManagement'
 import { UserRole } from './context/AuthContext'
 
 // Role-based route permissions
@@ -33,6 +34,7 @@ const rolePermissions: Record<string, UserRole[]> = {
   '/users': ['Super Admin', 'Operations Admin', 'Admin'],
   '/providers': ['Super Admin', 'Operations Admin', 'Admin'],
   '/services': ['Super Admin', 'Operations Admin', 'Admin'],
+  '/serviceability': ['Super Admin', 'Operations Admin', 'Admin'],
   '/kyc': ['Super Admin', 'Compliance Officer'],
   '/bookings': ['Super Admin', 'Operations Admin', 'Support Agent'],
   '/pricing': ['Super Admin', 'Finance Admin'],
@@ -257,6 +259,16 @@ function AppRoutes() {
           <ProtectedRoute requiredRoles={rolePermissions['/attendance']}>
             <Layout>
               <AttendanceManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/serviceability"
+        element={
+          <ProtectedRoute requiredRoles={rolePermissions['/serviceability']}>
+            <Layout>
+              <ServiceabilityManagement />
             </Layout>
           </ProtectedRoute>
         }

@@ -15,7 +15,8 @@ import {
   Timer,
   Fingerprint,
   Sparkles,
-  ClipboardList
+  ClipboardList,
+  MapPin
 } from 'lucide-react'
 import { useAuth, UserRole } from '../context/AuthContext'
 
@@ -31,6 +32,7 @@ const menuItems: MenuItem[] = [
   { path: '/users', icon: Users, label: 'User Management', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },
   { path: '/providers', icon: UserCog, label: 'Service Providers', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },
   { path: '/services', icon: Briefcase, label: 'Service Catalog', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },
+  { path: '/serviceability', icon: MapPin, label: 'Serviceability Management', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },
   { path: '/kyc', icon: FileCheck, label: 'KYC & Verification', requiredRoles: ['Super Admin', 'Compliance Officer'] },
   { path: '/bookings', icon: Calendar, label: 'Booking Management', requiredRoles: ['Super Admin', 'Operations Admin', 'Support Agent'] },
   { path: '/pricing', icon: DollarSign, label: 'Pricing & Commission', requiredRoles: ['Super Admin', 'Finance Admin'] },
