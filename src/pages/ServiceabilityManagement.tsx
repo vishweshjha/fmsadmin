@@ -16,6 +16,7 @@ import {
   X,
   Compass
 } from 'lucide-react'
+import { apiClient } from '../services/apiClient'
 
 // Fix default Leaflet marker icon issue in Vite/Webpack build
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -183,7 +184,17 @@ export default function ServiceabilityManagement() {
   const [successMsg, setSuccessMsg] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  const API_BASE = '/api'
+  // Helper to safely parse JSON from external APIs (Photon / Nominatim) without throwing
+  const safeFetchJson = async (url: string) => {
+    try {
+      const res = await fetch(url)
+      const text = await res.text()
+      return text && text.trim() ? JSON.parse(text) : {}
+    } catch (e) {
+      console.warn('Safe fetch JSON warning:', e)
+      return {}
+    }
+  }
 
   useEffect(() => {
     fetchLocations()
@@ -192,12 +203,11 @@ export default function ServiceabilityManagement() {
   const fetchLocations = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`${API_BASE}/admin/serviceable-locations`)
-      if (res.ok) {
-        const data = await res.json()
-        setLocations(data)
+      const res = await apiClient.get<ServiceableLocation[]>('/admin/serviceable-locations')
+      if (res.success && Array.isArray(res.data)) {
+        setLocations(res.data)
       } else {
-        // Mock fallback if initializing DB
+        // Fallback mock data if server table is initializing
         setLocations([
           {
             id: 'loc-1',
@@ -256,14 +266,14 @@ export default function ServiceabilityManagement() {
       // 2. OpenStreetMap Nominatim with India countrycode
       const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQuery)}&countrycodes=in&limit=8&addressdetails=1&namedetails=1`
 
-      const [photonRes, nomRes] = await Promise.allSettled([
-        fetch(photonUrl).then(r => r.json()),
-        fetch(nomUrl).then(r => r.json())
+      const [photonData, nomData] = await Promise.all([
+        safeFetchJson(photonUrl),
+        safeFetchJson(nomUrl)
       ])
 
       // Process Photon results
-      if (photonRes.status === 'fulfilled' && photonRes.value?.features) {
-        photonRes.value.features.forEach((feat: any, idx: number) => {
+      if (photonData && photonData.features) {
+        photonData.features.forEach((feat: any, idx: number) => {
           const props = feat.properties || {}
           const coords = feat.geometry?.coordinates || []
           if (coords.length === 2) {
@@ -293,8 +303,8 @@ export default function ServiceabilityManagement() {
       }
 
       // Process Nominatim results
-      if (nomRes.status === 'fulfilled' && Array.isArray(nomRes.value)) {
-        nomRes.value.forEach((item: any) => {
+      if (Array.isArray(nomData)) {
+        nomData.forEach((item: any) => {
           const lat = parseFloat(item.lat)
           const lon = parseFloat(item.lon)
           const addr = item.address || {}
@@ -339,29 +349,25 @@ export default function ServiceabilityManagement() {
   const reverseGeocode = async (lat: number, lng: number) => {
     setIsGeocoding(true)
     try {
-      const res = await fetch(
+      const data = await safeFetchJson(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`
       )
-      if (res.ok) {
-        const data = await res.json()
-        if (data && data.display_name) {
-          setAddress(data.display_name)
-          setSearchQuery(data.display_name)
+      if (data && data.display_name) {
+        setAddress(data.display_name)
+        setSearchQuery(data.display_name)
 
-          const addr = data.address || {}
-          const c = addr.city || addr.town || addr.village || addr.suburb || addr.district || 'New Delhi'
-          const s = addr.state || 'Delhi'
-          const p = addr.postcode || ''
+        const addr = data.address || {}
+        const c = addr.city || addr.town || addr.village || addr.suburb || addr.district || 'New Delhi'
+        const s = addr.state || 'Delhi'
+        const p = addr.postcode || ''
 
-          if (c) setCity(c)
-          if (s) setStateName(s)
-          if (p) setPincode(p)
+        if (c) setCity(c)
+        if (s) setStateName(s)
+        if (p) setPincode(p)
 
-          // Pre-populate society/location name if not manually edited
-          const mainTitle = data.display_name.split(',')[0]
-          if (!locationName) {
-            setLocationName(mainTitle)
-          }
+        const mainTitle = data.display_name.split(',')[0]
+        if (!locationName) {
+          setLocationName(mainTitle)
         }
       }
     } catch (e) {
@@ -456,21 +462,12 @@ export default function ServiceabilityManagement() {
     }
 
     try {
-      const url = editingLocation 
-        ? `${API_BASE}/admin/serviceable-locations/${editingLocation.id}`
-        : `${API_BASE}/admin/serviceable-locations`
-      const method = editingLocation ? 'PUT' : 'POST'
+      const res = editingLocation
+        ? await apiClient.put<ServiceableLocation>(`/admin/serviceable-locations/${editingLocation.id}`, payload)
+        : await apiClient.post<ServiceableLocation>('/admin/serviceable-locations', payload)
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        setErrorMsg(data.message || 'Failed to save location.')
+      if (!res.success) {
+        setErrorMsg(res.error?.message || 'Failed to save location.')
         setSubmitting(false)
         return
       }
@@ -489,19 +486,13 @@ export default function ServiceabilityManagement() {
 
   const handleToggleStatus = async (loc: ServiceableLocation) => {
     try {
-      const res = await fetch(`${API_BASE}/admin/serviceable-locations/${loc.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !loc.isActive })
-      })
-
-      if (res.ok) {
+      const res = await apiClient.put<ServiceableLocation>(`/admin/serviceable-locations/${loc.id}`, { isActive: !loc.isActive })
+      if (res.success) {
         setLocations(prev =>
           prev.map(l => (l.id === loc.id ? { ...l, isActive: !l.isActive } : l))
         )
       } else {
-        const data = await res.json()
-        alert(data.message || 'Failed to update status')
+        alert(res.error?.message || 'Failed to update status')
       }
     } catch (e) {
       console.warn('Error toggling status:', e)
@@ -512,14 +503,11 @@ export default function ServiceabilityManagement() {
     if (!window.confirm('Are you sure you want to delete this serviceable location?')) return
 
     try {
-      const res = await fetch(`${API_BASE}/admin/serviceable-locations/${id}`, {
-        method: 'DELETE'
-      })
-
-      if (res.ok) {
+      const res = await apiClient.delete(`/admin/serviceable-locations/${id}`)
+      if (res.success) {
         setLocations(prev => prev.filter(l => l.id !== id))
       } else {
-        alert('Failed to delete location')
+        alert(res.error?.message || 'Failed to delete location')
       }
     } catch (e) {
       console.warn('Error deleting location:', e)

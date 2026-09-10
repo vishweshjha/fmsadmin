@@ -50,11 +50,14 @@ class ApiClient {
   }
 
   private async handleResponse<T>(response: Response): Promise<{ success: boolean; data?: T; error?: any; pagination?: any; message?: string }> {
-    let data: any
-    const contentType = response.headers.get('content-type')
-    if (contentType && contentType.includes('application/json')) {
-      data = await response.json()
-    } else {
+    let data: any = {}
+    try {
+      const text = await response.text()
+      if (text && text.trim().length > 0) {
+        data = JSON.parse(text)
+      }
+    } catch (e) {
+      console.warn('Response was not valid JSON:', e)
       data = {}
     }
 
