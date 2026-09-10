@@ -18,7 +18,9 @@
     "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
+    "@types/leaflet": "^1.9.22",
     "date-fns": "^2.30.0",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.294.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

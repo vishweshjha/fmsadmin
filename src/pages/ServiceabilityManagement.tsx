@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import L from 'leaflet'
 import { 
   MapPin, 
   Search, 
@@ -12,8 +13,17 @@ import {
   AlertTriangle,
   Globe,
   Loader2,
-  X
+  X,
+  Compass
 } from 'lucide-react'
+
+// Fix default Leaflet marker icon issue in Vite/Webpack build
+delete (L.Icon.Default.prototype as any)._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+})
 
 interface ServiceableLocation {
   id: string
@@ -29,20 +39,114 @@ interface ServiceableLocation {
   createdAt?: string
 }
 
-interface NominatimSuggestion {
-  place_id: number
+interface LocationSuggestion {
+  id: string
   display_name: string
-  lat: string
-  lon: string;
-  address?: {
-    road?: string
-    suburb?: string
-    city?: string
-    town?: string;
-    village?: string
-    state?: string
-    postcode?: string
-  }
+  title: string
+  lat: number
+  lng: number
+  city: string
+  state: string
+  pincode: string
+  suburbOrSociety?: string
+}
+
+// Custom Leaflet Map Component with Click & Drag pin placement
+interface LeafletMapPickerProps {
+  lat: number
+  lng: number
+  onLocationSelect: (lat: number, lng: number) => void
+}
+
+const LeafletMapPicker: React.FC<LeafletMapPickerProps> = ({ lat, lng, onLocationSelect }) => {
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const mapInstanceRef = useRef<L.Map | null>(null)
+  const markerRef = useRef<L.Marker | null>(null)
+
+  useEffect(() => {
+    if (!mapContainerRef.current) return
+
+    // Default center to Delhi NCR if 0/empty
+    const centerLat = lat || 28.6139
+    const centerLng = lng || 77.2090
+
+    if (!mapInstanceRef.current) {
+      const map = L.map(mapContainerRef.current, {
+        center: [centerLat, centerLng],
+        zoom: 15,
+        zoomControl: true,
+      })
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19,
+      }).addTo(map)
+
+      const customIcon = L.divIcon({
+        className: 'custom-map-pin',
+        html: `
+          <div style="background-color: #4F46E5; width: 36px; height: 36px; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transform: translate(-50%, -100%);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+              <circle cx="12" cy="10" r="3"></circle>
+            </svg>
+          </div>
+        `,
+        iconSize: [36, 36],
+        iconAnchor: [18, 36],
+      })
+
+      const marker = L.marker([centerLat, centerLng], {
+        draggable: true,
+        icon: customIcon,
+      }).addTo(map)
+
+      marker.on('dragend', () => {
+        const position = marker.getLatLng()
+        onLocationSelect(position.lat, position.lng)
+      })
+
+      map.on('click', (e: L.LeafletMouseEvent) => {
+        marker.setLatLng(e.latlng)
+        onLocationSelect(e.latlng.lat, e.latlng.lng)
+      })
+
+      mapInstanceRef.current = map
+      markerRef.current = marker
+
+      // Ensure map renders correctly inside modal
+      setTimeout(() => {
+        map.invalidateSize()
+      }, 250)
+    } else {
+      const map = mapInstanceRef.current
+      const marker = markerRef.current
+
+      map.flyTo([centerLat, centerLng], 16, { animate: true, duration: 1 })
+      if (marker) {
+        marker.setLatLng([centerLat, centerLng])
+      }
+    }
+  }, [lat, lng])
+
+  useEffect(() => {
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove()
+        mapInstanceRef.current = null
+      }
+    }
+  }, [])
+
+  return (
+    <div className="relative w-full h-64 rounded-xl overflow-hidden border border-gray-300 shadow-inner bg-slate-100">
+      <div ref={mapContainerRef} className="w-full h-full z-10" />
+      <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg shadow-md border border-gray-200 z-20 text-[11px] font-semibold text-gray-700 flex items-center gap-1.5">
+        <Navigation className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+        <span>Click map or drag pin to select location</span>
+      </div>
+    </div>
+  )
 }
 
 export default function ServiceabilityManagement() {
@@ -60,8 +164,8 @@ export default function ServiceabilityManagement() {
   const [locationName, setLocationName] = useState('')
   const [locationType, setLocationType] = useState<'AREA' | 'APARTMENT'>('AREA')
   const [address, setAddress] = useState('')
-  const [latitude, setLatitude] = useState<number | ''>('')
-  const [longitude, setLongitude] = useState<number | ''>('')
+  const [latitude, setLatitude] = useState<number>(28.6139)
+  const [longitude, setLongitude] = useState<number>(77.2090)
   const [city, setCity] = useState('')
   const [stateName, setStateName] = useState('')
   const [pincode, setPincode] = useState('')
@@ -69,9 +173,10 @@ export default function ServiceabilityManagement() {
 
   // Search Box State for Map
   const [searchQuery, setSearchQuery] = useState('')
-  const [suggestions, setSuggestions] = useState<NominatimSuggestion[]>([])
+  const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [isGeocoding, setIsGeocoding] = useState(false)
 
   // Feedback Alerts
   const [errorMsg, setErrorMsg] = useState('')
@@ -92,7 +197,7 @@ export default function ServiceabilityManagement() {
         const data = await res.json()
         setLocations(data)
       } else {
-        // Fallback mock data if server table is being initialized
+        // Mock fallback if initializing DB
         setLocations([
           {
             id: 'loc-1',
@@ -119,19 +224,6 @@ export default function ServiceabilityManagement() {
             pincode: '201014',
             isActive: true,
             createdAt: new Date().toISOString()
-          },
-          {
-            id: 'loc-3',
-            name: 'DLF Phase 3',
-            locationType: 'AREA',
-            address: 'DLF Phase 3, Sector 24, Gurugram',
-            latitude: 28.4950,
-            longitude: 77.0890,
-            city: 'Gurugram',
-            state: 'Haryana',
-            pincode: '122002',
-            isActive: true,
-            createdAt: new Date().toISOString()
           }
         ])
       }
@@ -142,10 +234,10 @@ export default function ServiceabilityManagement() {
     }
   }
 
-  // Handle Search Input for Map Suggestions
+  // Enhanced Multi-provider Search engine specifically indexing Indian Societies & Apartments
   const handleSearchInputChange = (text: string) => {
     setSearchQuery(text)
-    if (text.trim().length >= 3) {
+    if (text.trim().length >= 2) {
       fetchSuggestions(text.trim())
     } else {
       setSuggestions([])
@@ -156,60 +248,160 @@ export default function ServiceabilityManagement() {
   const fetchSuggestions = async (query: string) => {
     setIsSearching(true)
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=in&limit=5&addressdetails=1`
-      )
-      const data = await res.json()
-      if (Array.isArray(data) && data.length > 0) {
-        setSuggestions(data)
+      const cleanQuery = query.trim()
+      const results: LocationSuggestion[] = []
+
+      // 1. Photon Search API (Indexed Indian Apartments, Societies, Complex Names & POIs)
+      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQuery)}&limit=8&lang=en`
+      // 2. OpenStreetMap Nominatim with India countrycode
+      const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQuery)}&countrycodes=in&limit=8&addressdetails=1&namedetails=1`
+
+      const [photonRes, nomRes] = await Promise.allSettled([
+        fetch(photonUrl).then(r => r.json()),
+        fetch(nomUrl).then(r => r.json())
+      ])
+
+      // Process Photon results
+      if (photonRes.status === 'fulfilled' && photonRes.value?.features) {
+        photonRes.value.features.forEach((feat: any, idx: number) => {
+          const props = feat.properties || {}
+          const coords = feat.geometry?.coordinates || []
+          if (coords.length === 2) {
+            const lon = coords[0]
+            const lat = coords[1]
+            const title = props.name || props.street || cleanQuery
+            const city = props.city || props.district || props.county || props.state || 'Noida'
+            const state = props.state || 'Uttar Pradesh'
+            const pincode = props.postcode || ''
+            
+            const parts = [props.name, props.street, props.district, props.city, props.state, props.country].filter(Boolean)
+            const display_name = parts.join(', ')
+
+            results.push({
+              id: `photon-${idx}-${props.osm_id || idx}`,
+              title,
+              display_name,
+              lat,
+              lng: lon,
+              city,
+              state,
+              pincode,
+              suburbOrSociety: props.name
+            })
+          }
+        })
+      }
+
+      // Process Nominatim results
+      if (nomRes.status === 'fulfilled' && Array.isArray(nomRes.value)) {
+        nomRes.value.forEach((item: any) => {
+          const lat = parseFloat(item.lat)
+          const lon = parseFloat(item.lon)
+          const addr = item.address || {}
+          const title = item.display_name.split(',')[0]
+          const city = addr.city || addr.town || addr.village || addr.suburb || addr.county || 'New Delhi'
+          const state = addr.state || 'Delhi'
+          const pincode = addr.postcode || ''
+
+          // Avoid duplicate coordinates
+          const isDuplicate = results.some(r => Math.abs(r.lat - lat) < 0.0005 && Math.abs(r.lng - lon) < 0.0005)
+          if (!isDuplicate) {
+            results.push({
+              id: `nom-${item.place_id}`,
+              title,
+              display_name: item.display_name,
+              lat,
+              lng: lon,
+              city,
+              state,
+              pincode,
+              suburbOrSociety: title
+            })
+          }
+        })
+      }
+
+      if (results.length > 0) {
+        setSuggestions(results)
         setShowSuggestions(true)
       } else {
         setSuggestions([])
         setShowSuggestions(false)
       }
     } catch (e) {
-      console.warn('Nominatim search error:', e)
+      console.warn('Search suggestions error:', e)
     } finally {
       setIsSearching(false)
     }
   }
 
-  const handleSelectSuggestion = (item: NominatimSuggestion) => {
-    const lat = parseFloat(item.lat)
-    const lng = parseFloat(item.lon)
+  // Reverse Geocode when Admin clicks or drags marker pin on map
+  const reverseGeocode = async (lat: number, lng: number) => {
+    setIsGeocoding(true)
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`
+      )
+      if (res.ok) {
+        const data = await res.json()
+        if (data && data.display_name) {
+          setAddress(data.display_name)
+          setSearchQuery(data.display_name)
 
+          const addr = data.address || {}
+          const c = addr.city || addr.town || addr.village || addr.suburb || addr.district || 'New Delhi'
+          const s = addr.state || 'Delhi'
+          const p = addr.postcode || ''
+
+          if (c) setCity(c)
+          if (s) setStateName(s)
+          if (p) setPincode(p)
+
+          // Pre-populate society/location name if not manually edited
+          const mainTitle = data.display_name.split(',')[0]
+          if (!locationName) {
+            setLocationName(mainTitle)
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Reverse geocode error:', e)
+    } finally {
+      setIsGeocoding(false)
+    }
+  }
+
+  const handleSelectSuggestion = (item: LocationSuggestion) => {
     setShowSuggestions(false)
     setSearchQuery(item.display_name)
     setAddress(item.display_name)
-    setLatitude(lat)
-    setLongitude(lng)
+    setLatitude(item.lat)
+    setLongitude(item.lng)
+    setCity(item.city)
+    setStateName(item.state)
+    setPincode(item.pincode)
 
-    // Pre-populate name if empty
-    const mainTitle = item.display_name.split(',')[0]
-    if (!locationName) {
-      setLocationName(mainTitle)
+    if (!locationName || locationName === 'New Location') {
+      setLocationName(item.title)
     }
+  }
 
-    if (item.address) {
-      const c = item.address.city || item.address.town || item.address.village || 'Noida'
-      const s = item.address.state || 'Uttar Pradesh'
-      const p = item.address.postcode || '201301'
-      setCity(c)
-      setStateName(s)
-      setPincode(p)
-    }
+  const handleMapPinSelected = (newLat: number, newLng: number) => {
+    setLatitude(newLat)
+    setLongitude(newLng)
+    reverseGeocode(newLat, newLng)
   }
 
   const handleOpenAddModal = () => {
     setEditingLocation(null)
     setLocationName('')
     setLocationType('AREA')
-    setAddress('')
-    setLatitude('')
-    setLongitude('')
-    setCity('')
-    setStateName('')
-    setPincode('')
+    setAddress('Connaught Place, New Delhi, Delhi 110001')
+    setLatitude(28.6139)
+    setLongitude(77.2090)
+    setCity('New Delhi')
+    setStateName('Delhi')
+    setPincode('110001')
     setIsActive(true)
     setSearchQuery('')
     setSuggestions([])
@@ -241,12 +433,11 @@ export default function ServiceabilityManagement() {
     setErrorMsg('')
     setSuccessMsg('')
 
-    // FR-15: Prevent saving without valid address and map location
     if (!locationName.trim()) {
       setErrorMsg('Please enter a location or apartment name.')
       return
     }
-    if (!address.trim() || latitude === '' || longitude === '') {
+    if (!address.trim() || !latitude || !longitude) {
       setErrorMsg('Please search and select a valid address on the map to capture coordinates.')
       return
     }
@@ -279,7 +470,6 @@ export default function ServiceabilityManagement() {
       const data = await res.json()
 
       if (!res.ok) {
-        // FR-16: Duplicate detection handling
         setErrorMsg(data.message || 'Failed to save location.')
         setSubmitting(false)
         return
@@ -298,32 +488,41 @@ export default function ServiceabilityManagement() {
   }
 
   const handleToggleStatus = async (loc: ServiceableLocation) => {
-    const updatedStatus = !loc.isActive
     try {
       const res = await fetch(`${API_BASE}/admin/serviceable-locations/${loc.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: updatedStatus })
+        body: JSON.stringify({ isActive: !loc.isActive })
       })
 
       if (res.ok) {
-        setLocations(prev => prev.map(l => l.id === loc.id ? { ...l, isActive: updatedStatus } : l))
+        setLocations(prev =>
+          prev.map(l => (l.id === loc.id ? { ...l, isActive: !l.isActive } : l))
+        )
       } else {
-        // Update state locally for fast UI responsiveness
-        setLocations(prev => prev.map(l => l.id === loc.id ? { ...l, isActive: updatedStatus } : l))
+        const data = await res.json()
+        alert(data.message || 'Failed to update status')
       }
     } catch (e) {
-      setLocations(prev => prev.map(l => l.id === loc.id ? { ...l, isActive: updatedStatus } : l))
+      console.warn('Error toggling status:', e)
     }
   }
 
   const handleDeleteLocation = async (id: string) => {
-    if (!confirm('Are you sure you want to remove this serviceable location?')) return
+    if (!window.confirm('Are you sure you want to delete this serviceable location?')) return
+
     try {
-      await fetch(`${API_BASE}/admin/serviceable-locations/${id}`, { method: 'DELETE' })
-      setLocations(prev => prev.filter(l => l.id !== id))
+      const res = await fetch(`${API_BASE}/admin/serviceable-locations/${id}`, {
+        method: 'DELETE'
+      })
+
+      if (res.ok) {
+        setLocations(prev => prev.filter(l => l.id !== id))
+      } else {
+        alert('Failed to delete location')
+      }
     } catch (e) {
-      setLocations(prev => prev.filter(l => l.id !== id))
+      console.warn('Error deleting location:', e)
     }
   }
 
@@ -352,72 +551,43 @@ export default function ServiceabilityManagement() {
             <Globe className="w-7 h-7 text-indigo-600" />
             <h1 className="text-2xl font-bold text-gray-900">Serviceability Management</h1>
           </div>
-          <p className="text-gray-500 text-sm mt-1">
-            Configure serviceable localities, societies & apartments where GYORS service is available.
+          <p className="text-sm text-gray-500 mt-1">
+            Search, pin, and configure serviceable areas and apartment societies in India where GYORS service is available.
           </p>
         </div>
-
         <button
           onClick={handleOpenAddModal}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg shadow-sm transition-colors"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-sm transition-colors text-sm"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-4 h-4" />
           <span>Add Serviceable Location</span>
         </button>
       </div>
 
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Locations</p>
-          <p className="text-2xl font-bold text-gray-900 mt-2">{locations.length}</p>
-        </div>
-        <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Active Locations</p>
-          <p className="text-2xl font-bold text-emerald-600 mt-2">
-            {locations.filter(l => l.isActive).length}
-          </p>
-        </div>
-        <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Apartments / Societies</p>
-          <p className="text-2xl font-bold text-purple-600 mt-2">
-            {locations.filter(l => l.locationType === 'APARTMENT').length}
-          </p>
-        </div>
-        <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Areas / Localities</p>
-          <p className="text-2xl font-bold text-blue-600 mt-2">
-            {locations.filter(l => l.locationType === 'AREA').length}
-          </p>
-        </div>
-      </div>
-
-      {/* Search & Filter Toolbar */}
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 justify-between items-center">
-        <div className="relative flex-1 w-full">
-          <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+      {/* Filter & Search Toolbar */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by area, society name, city or address..."
+            placeholder="Search by area, apartment, society name, or city..."
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          {/* Type Filter */}
+        <div className="flex items-center gap-3">
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as any)}
             className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-700 font-medium outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <option value="ALL">All Types</option>
-            <option value="AREA">Area / Locality</option>
-            <option value="APARTMENT">Apartment / Society</option>
+            <option value="AREA">Areas / Localities</option>
+            <option value="APARTMENT">Apartments / Societies</option>
           </select>
 
-          {/* Status Filter */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
@@ -448,45 +618,42 @@ export default function ServiceabilityManagement() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  <th className="px-6 py-3.5">Location / Society Name</th>
+                  <th className="px-6 py-3.5">Location / Society</th>
                   <th className="px-6 py-3.5">Type</th>
-                  <th className="px-6 py-3.5">Full Address</th>
-                  <th className="px-6 py-3.5">City & State</th>
-                  <th className="px-6 py-3.5">Coordinates (Lat, Lng)</th>
+                  <th className="px-6 py-3.5">City / Pincode</th>
+                  <th className="px-6 py-3.5">Coordinates</th>
                   <th className="px-6 py-3.5">Status</th>
                   <th className="px-6 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 text-sm text-gray-700">
+              <tbody className="divide-y divide-gray-200 text-sm">
                 {filteredLocations.map((loc) => (
-                  <tr key={loc.id} className="hover:bg-gray-50/80 transition-colors">
-                    <td className="px-6 py-4 font-semibold text-gray-900">
-                      <div className="flex items-center gap-2">
-                        {loc.locationType === 'APARTMENT' ? (
-                          <Building2 className="w-4 h-4 text-purple-600 flex-shrink-0" />
-                        ) : (
-                          <MapPin className="w-4 h-4 text-indigo-600 flex-shrink-0" />
-                        )}
-                        <span>{loc.name}</span>
+                  <tr key={loc.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${loc.locationType === 'APARTMENT' ? 'bg-purple-100 text-purple-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                          {loc.locationType === 'APARTMENT' ? <Building2 className="w-5 h-5" /> : <MapPin className="w-5 h-5" />}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-900">{loc.name}</div>
+                          <div className="text-xs text-gray-500 max-w-xs truncate">{loc.address}</div>
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                        loc.locationType === 'APARTMENT'
-                          ? 'bg-purple-100 text-purple-800'
-                          : 'bg-indigo-100 text-indigo-800'
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        loc.locationType === 'APARTMENT' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                       }`}>
-                        {loc.locationType === 'APARTMENT' ? 'Apartment / Society' : 'Area / Locality'}
+                        {loc.locationType === 'APARTMENT' ? 'Apartment/Society' : 'Area/Locality'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 max-w-xs truncate text-gray-600" title={loc.address}>
-                      {loc.address}
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-gray-900">{loc.city}</div>
+                      <div className="text-xs text-gray-500">{loc.pincode || 'N/A'}</div>
                     </td>
-                    <td className="px-6 py-4 font-medium text-gray-800">
-                      {loc.city}, {loc.state} ({loc.pincode})
-                    </td>
-                    <td className="px-6 py-4 font-mono text-xs text-gray-500">
-                      {loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}
+                    <td className="px-6 py-4 font-mono text-xs text-gray-600">
+                      <div>Lat: {loc.latitude.toFixed(5)}</div>
+                      <div>Lng: {loc.longitude.toFixed(5)}</div>
                     </td>
                     <td className="px-6 py-4">
                       <button
@@ -527,21 +694,21 @@ export default function ServiceabilityManagement() {
         )}
       </div>
 
-      {/* Add / Edit Location Modal */}
+      {/* Add / Edit Serviceable Location Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden my-8">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden my-8 border border-gray-100 animate-in fade-in zoom-in duration-150">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 bg-gray-900 text-white">
+            <div className="flex items-center justify-between px-6 py-4 bg-gray-50 border-b border-gray-200">
               <div className="flex items-center gap-2">
-                <Navigation className="w-5 h-5 text-indigo-400" />
-                <h3 className="text-lg font-bold">
-                  {editingLocation ? 'Edit Serviceable Location' : 'Add Serviceable Location'}
-                </h3>
+                <Compass className="w-5 h-5 text-indigo-600" />
+                <h2 className="text-lg font-bold text-gray-900">
+                  {editingLocation ? 'Edit Serviceable Location' : 'Add New Serviceable Location'}
+                </h2>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-gray-400 hover:text-white p-1 rounded-lg transition-colors"
+                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-200/60 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -600,13 +767,13 @@ export default function ServiceabilityManagement() {
               {/* Map Address Search Bar */}
               <div className="relative">
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                  Search Address / Locality on Map <span className="text-red-500">*</span>
+                  Search Society / Apartment / Area in India <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Type area, society, landmark, building or street address..."
+                    placeholder="Type society (e.g. French Apartments, Gaur City, DLF Cyber City, Hiranandani)..."
                     value={searchQuery}
                     onChange={(e) => handleSearchInputChange(e.target.value)}
                     onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
@@ -622,42 +789,40 @@ export default function ServiceabilityManagement() {
                   <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 z-30 max-h-60 overflow-y-auto">
                     {suggestions.map((item) => (
                       <button
-                        key={item.place_id}
+                        key={item.id}
                         type="button"
                         onClick={() => handleSelectSuggestion(item)}
                         className="w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-indigo-50 transition-colors flex items-start gap-2.5"
                       >
-                        <MapPin className="w-4 h-4 text-indigo-600 mt-0.5 flex-shrink-0" />
-                        <span className="text-xs text-gray-800 font-medium leading-relaxed">
-                          {item.display_name}
-                        </span>
+                        <Building2 className="w-4 h-4 text-indigo-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <div className="text-xs font-bold text-gray-900">{item.title}</div>
+                          <div className="text-[11px] text-gray-500 leading-tight mt-0.5">{item.display_name}</div>
+                        </div>
                       </button>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Interactive Map Visualizer */}
-              {latitude !== '' && longitude !== '' && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-gray-600">
-                    <span className="font-bold uppercase tracking-wider text-gray-700">Selected Map Location</span>
-                    <span className="font-mono text-indigo-600 font-semibold">
-                      Lat: {Number(latitude).toFixed(6)} | Lng: {Number(longitude).toFixed(6)}
-                    </span>
-                  </div>
-                  <div className="w-full h-44 bg-slate-900 rounded-xl overflow-hidden relative border border-slate-700 shadow-inner flex items-center justify-center">
-                    <iframe
-                      title="Map View"
-                      width="100%"
-                      height="100%"
-                      frameBorder="0"
-                      scrolling="no"
-                      src={`https://www.openstreetmap.org/export/embed.html?bbox=${Number(longitude)-0.005}%2C${Number(latitude)-0.005}%2C${Number(longitude)+0.005}%2C${Number(latitude)+0.005}&layer=mapnik&marker=${latitude}%2C${longitude}`}
-                    />
-                  </div>
+              {/* Interactive Leaflet Map Picker */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs text-gray-600">
+                  <span className="font-bold uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
+                    Interactive Map Pin Placement
+                    {isGeocoding && <Loader2 className="w-3 h-3 animate-spin text-indigo-600" />}
+                  </span>
+                  <span className="font-mono text-indigo-600 font-semibold">
+                    Lat: {Number(latitude).toFixed(5)} | Lng: {Number(longitude).toFixed(5)}
+                  </span>
                 </div>
-              )}
+
+                <LeafletMapPicker
+                  lat={Number(latitude)}
+                  lng={Number(longitude)}
+                  onLocationSelect={handleMapPinSelected}
+                />
+              </div>
 
               {/* Location Details Form Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -716,46 +881,46 @@ export default function ServiceabilityManagement() {
                 </div>
               </div>
 
-              {/* Full Address */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                  Full Captured Address <span className="text-red-500">*</span>
+                  Full Captured Address
                 </label>
                 <textarea
                   rows={2}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Full captured address..."
-                  required
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 font-medium focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
+                  placeholder="Address automatically captured from map pin placement..."
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 font-medium focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none resize-none"
                 />
               </div>
 
-              {/* Active Toggle Switch */}
+              {/* Active / Inactive Status Toggle */}
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
                 <div>
-                  <p className="text-sm font-bold text-gray-900">Activate for Customer Serviceability</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Only active locations are evaluated during customer app address verification.
-                  </p>
+                  <div className="text-sm font-bold text-gray-900">Service Availability Status</div>
+                  <div className="text-xs text-gray-500">Active locations allow customer bookings in this zone.</div>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isActive}
-                    onChange={(e) => setIsActive(e.target.checked)}
-                    className="sr-only peer"
+                <button
+                  type="button"
+                  onClick={() => setIsActive(!isActive)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    isActive ? 'bg-indigo-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      isActive ? 'translate-x-6' : 'translate-x-1'
+                    }`}
                   />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                </label>
+                </button>
               </div>
 
-              {/* Form Footer Buttons */}
+              {/* Actions */}
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-sm rounded-lg transition-colors"
+                  className="px-5 py-2.5 text-gray-700 font-semibold text-sm hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
