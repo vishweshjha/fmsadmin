@@ -261,14 +261,49 @@ export default function ServiceabilityManagement() {
       const cleanQuery = query.trim()
       const results: LocationSuggestion[] = []
 
-      // 1. Photon Search API (Indexed Indian Apartments, Societies, Complex Names & POIs)
-      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQuery)}&limit=8&lang=en`
-      // 2. OpenStreetMap Nominatim with India countrycode
-      const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQuery)}&countrycodes=in&limit=8&addressdetails=1&namedetails=1`
+      // 0. Always include custom society fallback option at top
+      results.push({
+        id: `custom-add-${Date.now()}`,
+        title: cleanQuery,
+        display_name: `${cleanQuery} (Select map location or pin on map)`,
+        lat: Number(latitude) || 28.5355,
+        lng: Number(longitude) || 77.3910,
+        city: city || 'Noida',
+        state: stateName || 'Uttar Pradesh',
+        pincode: pincode || '201306',
+        suburbOrSociety: cleanQuery
+      })
 
-      const [photonData, nomData] = await Promise.all([
+      // 1. Search existing configured DB locations
+      const dbMatches = locations.filter(loc => 
+        loc.name.toLowerCase().includes(cleanQuery.toLowerCase()) ||
+        loc.address.toLowerCase().includes(cleanQuery.toLowerCase())
+      )
+      dbMatches.forEach((loc, idx) => {
+        results.push({
+          id: `db-${loc.id}-${idx}`,
+          title: `🏷️ ${loc.name} (Configured Location)`,
+          display_name: `${loc.name} - ${loc.address}`,
+          lat: loc.latitude,
+          lng: loc.longitude,
+          city: loc.city,
+          state: loc.state,
+          pincode: loc.pincode,
+          suburbOrSociety: loc.name
+        })
+      })
+
+      // 2. Photon Search API with explicit India Bounding Box (bbox=68.1,6.5,97.4,35.5) and location bias (lat=28.53, lon=77.39)
+      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQuery)}&limit=10&lat=28.5355&lon=77.3910&bbox=68.1,6.5,97.4,35.5`
+      // 3. OpenStreetMap Nominatim with India countrycode
+      const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQuery)}&countrycodes=in&limit=8&addressdetails=1&namedetails=1`
+      // 4. OpenStreetMap Nominatim with explicit India appended
+      const nomIndiaUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQuery + ', India')}&limit=8&addressdetails=1&namedetails=1`
+
+      const [photonData, nomData, nomIndiaData] = await Promise.all([
         safeFetchJson(photonUrl),
-        safeFetchJson(nomUrl)
+        safeFetchJson(nomUrl),
+        safeFetchJson(nomIndiaUrl)
       ])
 
       // Process Photon results
@@ -287,57 +322,53 @@ export default function ServiceabilityManagement() {
             const parts = [props.name, props.street, props.district, props.city, props.state, props.country].filter(Boolean)
             const display_name = parts.join(', ')
 
-            results.push({
-              id: `photon-${idx}-${props.osm_id || idx}`,
-              title,
-              display_name,
-              lat,
-              lng: lon,
-              city,
-              state,
-              pincode,
-              suburbOrSociety: props.name
-            })
+            const isDuplicate = results.some(r => Math.abs(r.lat - lat) < 0.0003 && Math.abs(r.lng - lon) < 0.0003)
+            if (!isDuplicate) {
+              results.push({
+                id: `photon-${idx}-${props.osm_id || idx}`,
+                title,
+                display_name,
+                lat,
+                lng: lon,
+                city,
+                state,
+                pincode,
+                suburbOrSociety: props.name
+              })
+            }
           }
         })
       }
 
       // Process Nominatim results
-      if (Array.isArray(nomData)) {
-        nomData.forEach((item: any) => {
-          const lat = parseFloat(item.lat)
-          const lon = parseFloat(item.lon)
-          const addr = item.address || {}
-          const title = item.display_name.split(',')[0]
-          const city = addr.city || addr.town || addr.village || addr.suburb || addr.county || 'New Delhi'
-          const state = addr.state || 'Delhi'
-          const pincode = addr.postcode || ''
+      const combineNom = [...(Array.isArray(nomData) ? nomData : []), ...(Array.isArray(nomIndiaData) ? nomIndiaData : [])]
+      combineNom.forEach((item: any) => {
+        const lat = parseFloat(item.lat)
+        const lon = parseFloat(item.lon)
+        const addr = item.address || {}
+        const title = item.display_name.split(',')[0]
+        const city = addr.city || addr.town || addr.village || addr.suburb || addr.county || 'Noida'
+        const state = addr.state || 'Uttar Pradesh'
+        const pincode = addr.postcode || ''
 
-          // Avoid duplicate coordinates
-          const isDuplicate = results.some(r => Math.abs(r.lat - lat) < 0.0005 && Math.abs(r.lng - lon) < 0.0005)
-          if (!isDuplicate) {
-            results.push({
-              id: `nom-${item.place_id}`,
-              title,
-              display_name: item.display_name,
-              lat,
-              lng: lon,
-              city,
-              state,
-              pincode,
-              suburbOrSociety: title
-            })
-          }
-        })
-      }
+        const isDuplicate = results.some(r => Math.abs(r.lat - lat) < 0.0003 && Math.abs(r.lng - lon) < 0.0003)
+        if (!isDuplicate) {
+          results.push({
+            id: `nom-${item.place_id}`,
+            title,
+            display_name: item.display_name,
+            lat,
+            lng: lon,
+            city,
+            state,
+            pincode,
+            suburbOrSociety: title
+          })
+        }
+      })
 
-      if (results.length > 0) {
-        setSuggestions(results)
-        setShowSuggestions(true)
-      } else {
-        setSuggestions([])
-        setShowSuggestions(false)
-      }
+      setSuggestions(results)
+      setShowSuggestions(true)
     } catch (e) {
       console.warn('Search suggestions error:', e)
     } finally {
