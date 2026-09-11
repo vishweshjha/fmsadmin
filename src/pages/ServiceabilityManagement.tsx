@@ -26,6 +26,12 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
+declare global {
+  interface Window {
+    google?: any
+  }
+}
+
 interface ServiceableLocation {
   id: string
   name: string
@@ -52,7 +58,7 @@ interface LocationSuggestion {
   suburbOrSociety?: string
 }
 
-// Custom Leaflet Map Component with Click & Drag pin placement
+// Custom Leaflet Map Component (Fallback)
 interface LeafletMapPickerProps {
   lat: number
   lng: number
@@ -67,7 +73,6 @@ const LeafletMapPicker: React.FC<LeafletMapPickerProps> = ({ lat, lng, onLocatio
   useEffect(() => {
     if (!mapContainerRef.current) return
 
-    // Default center to Delhi NCR if 0/empty
     const centerLat = lat || 28.6139
     const centerLng = lng || 77.2090
 
@@ -115,7 +120,6 @@ const LeafletMapPicker: React.FC<LeafletMapPickerProps> = ({ lat, lng, onLocatio
       mapInstanceRef.current = map
       markerRef.current = marker
 
-      // Ensure map renders correctly inside modal
       setTimeout(() => {
         map.invalidateSize()
       }, 250)
@@ -145,6 +149,113 @@ const LeafletMapPicker: React.FC<LeafletMapPickerProps> = ({ lat, lng, onLocatio
       <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg shadow-md border border-gray-200 z-20 text-[11px] font-semibold text-gray-700 flex items-center gap-1.5">
         <Navigation className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
         <span>Click map or drag pin to select location</span>
+      </div>
+    </div>
+  )
+}
+
+// Google Maps Interactive Picker Component
+const GoogleMapPicker: React.FC<LeafletMapPickerProps> = ({ lat, lng, onLocationSelect }) => {
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const mapInstanceRef = useRef<any>(null)
+  const markerRef = useRef<any>(null)
+  const [googleReady, setGoogleReady] = useState(false)
+  const [loadError, setLoadError] = useState(false)
+
+  useEffect(() => {
+    if (window.google && window.google.maps) {
+      setGoogleReady(true)
+      return
+    }
+
+    const apiKey = (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyAZr1_PfcH6Udj0Ut0Nxn2BctOMHLDzyGc'
+    const scriptId = 'google-maps-js-sdk'
+
+    const existingScript = document.getElementById(scriptId)
+    if (existingScript) {
+      const interval = setInterval(() => {
+        if (window.google && window.google.maps) {
+          setGoogleReady(true)
+          clearInterval(interval)
+        }
+      }, 200)
+      return () => clearInterval(interval)
+    }
+
+    const script = document.createElement('script')
+    script.id = scriptId
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`
+    script.async = true
+    script.defer = true
+    script.onload = () => setGoogleReady(true)
+    script.onerror = () => {
+      console.warn('Google Maps script load error, falling back to Leaflet map')
+      setLoadError(true)
+    }
+    document.head.appendChild(script)
+  }, [])
+
+  useEffect(() => {
+    if (!googleReady || !mapContainerRef.current || !window.google?.maps) return
+
+    const centerLat = lat || 28.6139
+    const centerLng = lng || 77.2090
+
+    if (!mapInstanceRef.current) {
+      const map = new window.google.maps.Map(mapContainerRef.current, {
+        center: { lat: centerLat, lng: centerLng },
+        zoom: 16,
+        mapTypeControl: true,
+        streetViewControl: false,
+        zoomControl: true,
+        fullscreenControl: true,
+      })
+
+      const marker = new window.google.maps.Marker({
+        position: { lat: centerLat, lng: centerLng },
+        map,
+        draggable: true,
+        title: 'Drag or click to select location',
+      })
+
+      marker.addListener('dragend', () => {
+        const pos = marker.getPosition()
+        if (pos) {
+          onLocationSelect(pos.lat(), pos.lng())
+        }
+      })
+
+      map.addListener('click', (e: any) => {
+        if (e.latLng) {
+          const clickLat = e.latLng.lat()
+          const clickLng = e.latLng.lng()
+          marker.setPosition({ lat: clickLat, lng: clickLng })
+          onLocationSelect(clickLat, clickLng)
+        }
+      })
+
+      mapInstanceRef.current = map
+      markerRef.current = marker
+    } else {
+      const map = mapInstanceRef.current
+      const marker = markerRef.current
+      map.setCenter({ lat: centerLat, lng: centerLng })
+      if (marker) {
+        marker.setPosition({ lat: centerLat, lng: centerLng })
+      }
+    }
+  }, [googleReady, lat, lng])
+
+  if (loadError || (!googleReady && !window.google?.maps)) {
+    return <LeafletMapPicker lat={lat} lng={lng} onLocationSelect={onLocationSelect} />
+  }
+
+  return (
+    <div className="relative w-full h-64 rounded-xl overflow-hidden border border-gray-300 shadow-inner bg-slate-100">
+      <div ref={mapContainerRef} className="w-full h-full z-10" />
+      <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg shadow-md border border-gray-200 z-20 text-[11px] font-semibold text-gray-700 flex items-center gap-1.5">
+        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span>Google Maps Active • Click map or drag pin</span>
       </div>
     </div>
   )
@@ -300,7 +411,63 @@ export default function ServiceabilityManagement() {
         })
       })
 
-      // 2. Tokenized Multi-Endpoint API Requests:
+      // 2. Google Places Autocomplete & Geocoder API (if Google Maps API loaded)
+      if (window.google?.maps?.places) {
+        try {
+          const autocompleteService = new window.google.maps.places.AutocompleteService()
+          autocompleteService.getPlacePredictions(
+            {
+              input: primaryName,
+              componentRestrictions: { country: 'in' },
+            },
+            (predictions: any, status: any) => {
+              if (status === window.google.maps.places.PlacesServiceStatus.OK && Array.isArray(predictions)) {
+                const geocoder = new window.google.maps.Geocoder()
+                predictions.slice(0, 5).forEach((pred: any) => {
+                  geocoder.geocode({ placeId: pred.place_id }, (geoResults: any, geoStatus: any) => {
+                    if (geoStatus === 'OK' && geoResults && geoResults[0]) {
+                      const item = geoResults[0]
+                      const lat = item.geometry.location.lat()
+                      const lng = item.geometry.location.lng()
+                      const title = pred.structured_formatting?.main_text || pred.description.split(',')[0]
+
+                      let c = 'Noida'
+                      let s = 'Uttar Pradesh'
+                      let p = ''
+
+                      item.address_components?.forEach((comp: any) => {
+                        if (comp.types.includes('locality') || comp.types.includes('administrative_area_level_2')) c = comp.long_name
+                        if (comp.types.includes('administrative_area_level_1')) s = comp.long_name
+                        if (comp.types.includes('postal_code')) p = comp.long_name
+                      })
+
+                      const isDup = results.some(r => Math.abs(r.lat - lat) < 0.0003 && Math.abs(r.lng - lng) < 0.0003)
+                      if (!isDup) {
+                        results.push({
+                          id: `google-${pred.place_id}`,
+                          title: `⚡ ${title} (Google Maps)`,
+                          display_name: pred.description,
+                          lat,
+                          lng,
+                          city: c,
+                          state: s,
+                          pincode: p,
+                          suburbOrSociety: title
+                        })
+                        setSuggestions([...results])
+                      }
+                    }
+                  })
+                })
+              }
+            }
+          )
+        } catch (e) {
+          console.warn('Google Places Autocomplete warning:', e)
+        }
+      }
+
+      // 3. Tokenized Multi-Endpoint API Requests:
       const photonPrimaryUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(primaryName)}&limit=10&lat=28.5355&lon=77.3910&bbox=68.1,6.5,97.4,35.5`
       const photonFullUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(sanitized)}&limit=10&lat=28.5355&lon=77.3910&bbox=68.1,6.5,97.4,35.5`
       const nomPrimaryUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(primaryName + ', India')}&limit=10&addressdetails=1&namedetails=1`
@@ -395,6 +562,40 @@ export default function ServiceabilityManagement() {
   // Reverse Geocode when Admin clicks or drags marker pin on map
   const reverseGeocode = async (lat: number, lng: number) => {
     setIsGeocoding(true)
+
+    // 1. Try Google Maps Geocoder if loaded
+    if (window.google?.maps) {
+      try {
+        const geocoder = new window.google.maps.Geocoder()
+        geocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
+          if (status === 'OK' && results && results[0]) {
+            const item = results[0]
+            setAddress(item.formatted_address)
+            setSearchQuery(item.formatted_address)
+
+            let c = ''
+            let s = ''
+            let p = ''
+
+            item.address_components?.forEach((comp: any) => {
+              if (comp.types.includes('locality') || comp.types.includes('administrative_area_level_2')) c = comp.long_name
+              if (comp.types.includes('administrative_area_level_1')) s = comp.long_name
+              if (comp.types.includes('postal_code')) p = comp.long_name
+            })
+
+            if (c) setCity(c)
+            if (s) setStateName(s)
+            if (p) setPincode(p)
+
+            const mainTitle = item.formatted_address.split(',')[0]
+            if (!locationName) setLocationName(mainTitle)
+          }
+        })
+      } catch (e) {
+        console.warn('Google Reverse Geocode warning:', e)
+      }
+    }
+
     try {
       const data = await safeFetchJson(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`
@@ -852,7 +1053,7 @@ export default function ServiceabilityManagement() {
                   </span>
                 </div>
 
-                <LeafletMapPicker
+                <GoogleMapPicker
                   lat={Number(latitude)}
                   lng={Number(longitude)}
                   onLocationSelect={handleMapPinSelected}
