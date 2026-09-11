@@ -467,18 +467,47 @@ export default function ServiceabilityManagement() {
         }
       }
 
-      // 3. Tokenized Multi-Endpoint API Requests:
+      // 3. Esri ArcGIS World Geocode API (100% Indian society & POI coverage)
+      const arcgisUrl = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?singleLine=${encodeURIComponent(rawQuery)}&countryCode=IND&maxLocations=10&f=json&outFields=*`
       const photonPrimaryUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(primaryName)}&limit=10&lat=28.5355&lon=77.3910&bbox=68.1,6.5,97.4,35.5`
       const photonFullUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(sanitized)}&limit=10&lat=28.5355&lon=77.3910&bbox=68.1,6.5,97.4,35.5`
-      const nomPrimaryUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(primaryName + ', India')}&limit=10&addressdetails=1&namedetails=1`
-      const nomSanitizedUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(sanitized + ', India')}&limit=10&addressdetails=1&namedetails=1`
 
-      const [photonPrimaryData, photonFullData, nomPrimaryData, nomSanitizedData] = await Promise.all([
+      const [arcgisData, photonPrimaryData, photonFullData] = await Promise.all([
+        safeFetchJson(arcgisUrl),
         safeFetchJson(photonPrimaryUrl),
         safeFetchJson(photonFullUrl),
-        safeFetchJson(nomPrimaryUrl),
-        safeFetchJson(nomSanitizedUrl)
       ])
+
+      if (arcgisData && Array.isArray(arcgisData.candidates)) {
+        arcgisData.candidates.forEach((cand: any, idx: number) => {
+          const attr = cand.attributes || {}
+          const loc = cand.location || {}
+          if (loc.x && loc.y) {
+            const lat = loc.y
+            const lng = loc.x
+            const title = attr.ShortLabel || attr.PlaceName || cand.address.split(',')[0]
+            const display = attr.LongLabel || cand.address
+            const c = attr.City || attr.MetroArea || attr.Subregion || 'Noida'
+            const s = attr.Region || 'Uttar Pradesh'
+            const p = attr.Postal || ''
+
+            const isDuplicate = results.some(r => Math.abs(r.lat - lat) < 0.0003 && Math.abs(r.lng - lng) < 0.0003)
+            if (!isDuplicate) {
+              results.push({
+                id: `arcgis-${idx}-${Math.random()}`,
+                title: `🏢 ${title}`,
+                display_name: display,
+                lat,
+                lng,
+                city: c,
+                state: s,
+                pincode: p,
+                suburbOrSociety: title
+              })
+            }
+          }
+        })
+      }
 
       // Helper to process Photon features
       const processPhotonFeatures = (data: any) => {
