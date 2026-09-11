@@ -49,7 +49,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email, password }),
       })
 
-      const responseData = await response.json()
+      const text = await response.text()
+      const responseData = text && text.trim() ? JSON.parse(text) : {}
 
       if (!response.ok) {
         // Surface the real backend message so the UI can show it
@@ -129,7 +130,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }),
       })
 
-      const responseData = await response.json()
+      const text = await response.text()
+      const responseData = text && text.trim() ? JSON.parse(text) : {}
 
       if (!response.ok) {
         const msg =

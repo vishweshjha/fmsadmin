@@ -22,7 +22,8 @@ export default function ForgotPassword() {
         body: JSON.stringify({ email }),
       })
 
-      const responseData = await response.json()
+      const text = await response.text()
+      const responseData = text && text.trim() ? JSON.parse(text) : {}
 
       if (!response.ok) {
         const serverMessage =
