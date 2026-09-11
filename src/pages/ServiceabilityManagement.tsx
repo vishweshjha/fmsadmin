@@ -258,26 +258,33 @@ export default function ServiceabilityManagement() {
   const fetchSuggestions = async (query: string) => {
     setIsSearching(true)
     try {
-      const cleanQuery = query.trim()
+      const rawQuery = query.trim()
+      // Sanitize filler words like "State", "district", "tehsil"
+      const sanitized = rawQuery.replace(/\b(state|district|tehsil|near|opposite)\b/gi, '').trim()
+      const commaParts = sanitized.split(',').map(s => s.trim()).filter(Boolean)
+      const primaryName = commaParts[0] || sanitized
+      const secondaryName = commaParts.slice(1).join(' ')
+
       const results: LocationSuggestion[] = []
 
       // 0. Always include custom society fallback option at top
       results.push({
         id: `custom-add-${Date.now()}`,
-        title: cleanQuery,
-        display_name: `${cleanQuery} (Select map location or pin on map)`,
+        title: rawQuery,
+        display_name: `${rawQuery} (Click map or drag pin to select location)`,
         lat: Number(latitude) || 28.5355,
         lng: Number(longitude) || 77.3910,
         city: city || 'Noida',
         state: stateName || 'Uttar Pradesh',
         pincode: pincode || '201306',
-        suburbOrSociety: cleanQuery
+        suburbOrSociety: rawQuery
       })
 
       // 1. Search existing configured DB locations
       const dbMatches = locations.filter(loc => 
-        loc.name.toLowerCase().includes(cleanQuery.toLowerCase()) ||
-        loc.address.toLowerCase().includes(cleanQuery.toLowerCase())
+        loc.name.toLowerCase().includes(primaryName.toLowerCase()) ||
+        loc.address.toLowerCase().includes(primaryName.toLowerCase()) ||
+        loc.city.toLowerCase().includes(primaryName.toLowerCase())
       )
       dbMatches.forEach((loc, idx) => {
         results.push({
@@ -293,79 +300,88 @@ export default function ServiceabilityManagement() {
         })
       })
 
-      // 2. Photon Search API with explicit India Bounding Box (bbox=68.1,6.5,97.4,35.5) and location bias (lat=28.53, lon=77.39)
-      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQuery)}&limit=10&lat=28.5355&lon=77.3910&bbox=68.1,6.5,97.4,35.5`
-      // 3. OpenStreetMap Nominatim with India countrycode
-      const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQuery)}&countrycodes=in&limit=8&addressdetails=1&namedetails=1`
-      // 4. OpenStreetMap Nominatim with explicit India appended
-      const nomIndiaUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQuery + ', India')}&limit=8&addressdetails=1&namedetails=1`
+      // 2. Tokenized Multi-Endpoint API Requests:
+      const photonPrimaryUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(primaryName)}&limit=10&lat=28.5355&lon=77.3910&bbox=68.1,6.5,97.4,35.5`
+      const photonFullUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(sanitized)}&limit=10&lat=28.5355&lon=77.3910&bbox=68.1,6.5,97.4,35.5`
+      const nomPrimaryUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(primaryName + ', India')}&limit=10&addressdetails=1&namedetails=1`
+      const nomSanitizedUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(sanitized + ', India')}&limit=10&addressdetails=1&namedetails=1`
 
-      const [photonData, nomData, nomIndiaData] = await Promise.all([
-        safeFetchJson(photonUrl),
-        safeFetchJson(nomUrl),
-        safeFetchJson(nomIndiaUrl)
+      const [photonPrimaryData, photonFullData, nomPrimaryData, nomSanitizedData] = await Promise.all([
+        safeFetchJson(photonPrimaryUrl),
+        safeFetchJson(photonFullUrl),
+        safeFetchJson(nomPrimaryUrl),
+        safeFetchJson(nomSanitizedUrl)
       ])
 
-      // Process Photon results
-      if (photonData && photonData.features) {
-        photonData.features.forEach((feat: any, idx: number) => {
-          const props = feat.properties || {}
-          const coords = feat.geometry?.coordinates || []
-          if (coords.length === 2) {
-            const lon = coords[0]
-            const lat = coords[1]
-            const title = props.name || props.street || cleanQuery
-            const city = props.city || props.district || props.county || props.state || 'Noida'
-            const state = props.state || 'Uttar Pradesh'
-            const pincode = props.postcode || ''
-            
-            const parts = [props.name, props.street, props.district, props.city, props.state, props.country].filter(Boolean)
-            const display_name = parts.join(', ')
+      // Helper to process Photon features
+      const processPhotonFeatures = (data: any) => {
+        if (data && Array.isArray(data.features)) {
+          data.features.forEach((feat: any, idx: number) => {
+            const props = feat.properties || {}
+            const coords = feat.geometry?.coordinates || []
+            if (coords.length === 2) {
+              const lon = coords[0]
+              const lat = coords[1]
+              const title = props.name || props.street || primaryName
+              const city = props.city || props.district || props.county || props.state || 'Noida'
+              const state = props.state || 'Uttar Pradesh'
+              const pincode = props.postcode || ''
+              const parts = [props.name, props.street, props.district, props.city, props.state, props.country].filter(Boolean)
+
+              const isDuplicate = results.some(r => Math.abs(r.lat - lat) < 0.0003 && Math.abs(r.lng - lon) < 0.0003)
+              if (!isDuplicate) {
+                results.push({
+                  id: `photon-${idx}-${props.osm_id || idx}-${Math.random()}`,
+                  title,
+                  display_name: parts.join(', '),
+                  lat,
+                  lng: lon,
+                  city,
+                  state,
+                  pincode,
+                  suburbOrSociety: props.name
+                })
+              }
+            }
+          })
+        }
+      }
+
+      processPhotonFeatures(photonPrimaryData)
+      processPhotonFeatures(photonFullData)
+
+      // Helper to process Nominatim features
+      const processNomData = (data: any) => {
+        if (Array.isArray(data)) {
+          data.forEach((item: any) => {
+            const lat = parseFloat(item.lat)
+            const lon = parseFloat(item.lon)
+            const addr = item.address || {}
+            const title = item.display_name.split(',')[0]
+            const city = addr.city || addr.town || addr.village || addr.suburb || addr.county || 'Noida'
+            const state = addr.state || 'Uttar Pradesh'
+            const pincode = addr.postcode || ''
 
             const isDuplicate = results.some(r => Math.abs(r.lat - lat) < 0.0003 && Math.abs(r.lng - lon) < 0.0003)
             if (!isDuplicate) {
               results.push({
-                id: `photon-${idx}-${props.osm_id || idx}`,
+                id: `nom-${item.place_id}-${Math.random()}`,
                 title,
-                display_name,
+                display_name: item.display_name,
                 lat,
                 lng: lon,
                 city,
                 state,
                 pincode,
-                suburbOrSociety: props.name
+                suburbOrSociety: title
               })
             }
-          }
-        })
-      }
-
-      // Process Nominatim results
-      const combineNom = [...(Array.isArray(nomData) ? nomData : []), ...(Array.isArray(nomIndiaData) ? nomIndiaData : [])]
-      combineNom.forEach((item: any) => {
-        const lat = parseFloat(item.lat)
-        const lon = parseFloat(item.lon)
-        const addr = item.address || {}
-        const title = item.display_name.split(',')[0]
-        const city = addr.city || addr.town || addr.village || addr.suburb || addr.county || 'Noida'
-        const state = addr.state || 'Uttar Pradesh'
-        const pincode = addr.postcode || ''
-
-        const isDuplicate = results.some(r => Math.abs(r.lat - lat) < 0.0003 && Math.abs(r.lng - lon) < 0.0003)
-        if (!isDuplicate) {
-          results.push({
-            id: `nom-${item.place_id}`,
-            title,
-            display_name: item.display_name,
-            lat,
-            lng: lon,
-            city,
-            state,
-            pincode,
-            suburbOrSociety: title
           })
         }
-      })
+      }
+
+      processNomData(nomPrimaryData)
+      processNomData(nomSanitizedData)
 
       setSuggestions(results)
       setShowSuggestions(true)
