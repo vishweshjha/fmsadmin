@@ -1,6 +1,18 @@
 import { useState, useEffect } from 'react'
-import { Search, RefreshCw, XCircle, Clock, CheckCircle, Loader2, AlertCircle, UserPlus } from 'lucide-react'
-import { fetchBookings, updateBookingStatus, assignProviderToBooking, fetchServiceProviders, type AdminBooking, type ServiceProvider } from '../services/gyorsApi'
+import { Search, RefreshCw, XCircle, Clock, CheckCircle, Loader2, AlertCircle, UserPlus, ListFilter, Plus, Trash2, X } from 'lucide-react'
+import {
+  fetchBookings,
+  updateBookingStatus,
+  assignProviderToBooking,
+  fetchServiceProviders,
+  fetchCancellationReasons,
+  createCancellationReason,
+  updateCancellationReason,
+  deleteCancellationReason,
+  type AdminBooking,
+  type ServiceProvider,
+  type AdminCancellationReason
+} from '../services/gyorsApi'
 
 export default function BookingManagement() {
   const [bookings, setBookings] = useState<AdminBooking[]>([])
@@ -10,6 +22,58 @@ export default function BookingManagement() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+
+  // Cancellation Reasons Modal State
+  const [showReasonsModal, setShowReasonsModal] = useState(false)
+  const [cancellationReasons, setCancellationReasons] = useState<AdminCancellationReason[]>([])
+  const [reasonsLoading, setReasonsLoading] = useState(false)
+  const [newReasonText, setNewReasonText] = useState('')
+  const [addingReason, setAddingReason] = useState(false)
+
+  const loadCancellationReasons = async () => {
+    setReasonsLoading(true)
+    try {
+      const data = await fetchCancellationReasons(true)
+      setCancellationReasons(data)
+    } catch (err) {
+      console.error('Failed to load cancellation reasons:', err)
+    } finally {
+      setReasonsLoading(false)
+    }
+  }
+
+  const handleAddReason = async () => {
+    if (!newReasonText.trim()) return
+    setAddingReason(true)
+    try {
+      await createCancellationReason(newReasonText.trim(), cancellationReasons.length)
+      setNewReasonText('')
+      await loadCancellationReasons()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to add cancellation reason')
+    } finally {
+      setAddingReason(false)
+    }
+  }
+
+  const handleToggleReasonActive = async (reasonObj: AdminCancellationReason) => {
+    try {
+      await updateCancellationReason(reasonObj.id, { isActive: !reasonObj.isActive })
+      await loadCancellationReasons()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update reason status')
+    }
+  }
+
+  const handleDeleteReason = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this cancellation reason?')) return
+    try {
+      await deleteCancellationReason(id)
+      await loadCancellationReasons()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete reason')
+    }
+  }
 
   const loadBookings = async () => {
     setLoading(true)
@@ -118,7 +182,16 @@ export default function BookingManagement() {
           <p className="text-gray-500 mt-1">Manage all bookings and overrides • {filteredBookings.length} shown</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={loadBookings} className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2">
+          <button
+            onClick={() => {
+              loadCancellationReasons()
+              setShowReasonsModal(true)
+            }}
+            className="bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-900 flex items-center gap-2 text-sm font-medium transition"
+          >
+            <ListFilter size={18} /> Manage Cancel Reasons
+          </button>
+          <button onClick={loadBookings} className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2 text-sm font-medium">
             <RefreshCw size={18} /> Refresh
           </button>
         </div>
@@ -262,6 +335,99 @@ export default function BookingManagement() {
           </div>
         </div>
       )}
+
+      {/* Cancellation Reasons Management Modal */}
+      {showReasonsModal && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 bg-gray-900 text-white flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <ListFilter size={20} /> Cancellation Reasons
+                </h3>
+                <p className="text-xs text-gray-300">Admin configured options shown to customers in Gyors app</p>
+              </div>
+              <button
+                onClick={() => setShowReasonsModal(false)}
+                className="text-gray-400 hover:text-white transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 flex-1 overflow-y-auto space-y-4">
+              {/* Add New Reason Input */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter new cancellation reason..."
+                  value={newReasonText}
+                  onChange={(e) => setNewReasonText(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddReason()}
+                  className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <button
+                  onClick={handleAddReason}
+                  disabled={addingReason || !newReasonText.trim()}
+                  className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50 flex items-center gap-1"
+                >
+                  {addingReason ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Add
+                </button>
+              </div>
+
+              {/* List of Reasons */}
+              {reasonsLoading ? (
+                <div className="py-8 text-center text-gray-500 flex flex-col items-center">
+                  <Loader2 className="animate-spin text-primary-600 mb-2" size={24} />
+                  Loading reasons...
+                </div>
+              ) : cancellationReasons.length === 0 ? (
+                <p className="py-8 text-center text-gray-400 text-sm">No cancellation reasons added yet.</p>
+              ) : (
+                <div className="divide-y border rounded-lg overflow-hidden">
+                  {cancellationReasons.map((item, idx) => (
+                    <div key={item.id} className="p-3 flex items-center justify-between bg-white hover:bg-gray-50 transition">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-gray-400 w-4">{idx + 1}.</span>
+                        <span className={`text-sm ${item.isActive ? 'text-gray-900 font-medium' : 'text-gray-400 line-through'}`}>
+                          {item.reason}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleToggleReasonActive(item)}
+                          className={`px-2.5 py-1 text-xs rounded-full font-semibold transition ${
+                            item.isActive ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          }`}
+                        >
+                          {item.isActive ? 'Active' : 'Disabled'}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteReason(item.id)}
+                          className="p-1 text-gray-400 hover:text-red-600 transition"
+                          title="Delete reason"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-3 bg-gray-50 border-t text-right">
+              <button
+                onClick={() => setShowReasonsModal(false)}
+                className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-300"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+

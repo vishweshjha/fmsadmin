@@ -132,12 +132,21 @@ export const API_ENDPOINTS = {
   // Admin - Banners
   BANNERS: {
     CREATE: `${BASE_URL}/banners`,
-    LIST: `${BASE_URL}/banners`,
+    LIST: `${BASE_URL}/banners/admin`,
     DETAIL: (id: string) => `${BASE_URL}/banners/${id}`,
     UPDATE: (id: string) => `${BASE_URL}/banners/${id}`,
     DELETE: (id: string) => `${BASE_URL}/banners/${id}`,
     TOGGLE: (id: string) => `${BASE_URL}/banners/${id}/status`,
     ACTIVE: `${BASE_URL}/banners/active`,
+  },
+
+  // Admin - Cancellation Reasons
+  CANCELLATION_REASONS: {
+    LIST: `${BASE_URL}/cancellation-reasons`,
+    ADMIN_LIST: `${BASE_URL}/cancellation-reasons/admin`,
+    CREATE: `${BASE_URL}/cancellation-reasons`,
+    UPDATE: (id: string) => `${BASE_URL}/cancellation-reasons/${id}`,
+    DELETE: (id: string) => `${BASE_URL}/cancellation-reasons/${id}`,
   },
 } as const
 

@@ -374,7 +374,6 @@ export default function ServiceabilityManagement() {
       const sanitized = rawQuery.replace(/\b(state|district|tehsil|near|opposite)\b/gi, '').trim()
       const commaParts = sanitized.split(',').map(s => s.trim()).filter(Boolean)
       const primaryName = commaParts[0] || sanitized
-      const secondaryName = commaParts.slice(1).join(' ')
 
       const results: LocationSuggestion[] = []
 
@@ -545,39 +544,6 @@ export default function ServiceabilityManagement() {
 
       processPhotonFeatures(photonPrimaryData)
       processPhotonFeatures(photonFullData)
-
-      // Helper to process Nominatim features
-      const processNomData = (data: any) => {
-        if (Array.isArray(data)) {
-          data.forEach((item: any) => {
-            const lat = parseFloat(item.lat)
-            const lon = parseFloat(item.lon)
-            const addr = item.address || {}
-            const title = item.display_name.split(',')[0]
-            const city = addr.city || addr.town || addr.village || addr.suburb || addr.county || 'Noida'
-            const state = addr.state || 'Uttar Pradesh'
-            const pincode = addr.postcode || ''
-
-            const isDuplicate = results.some(r => Math.abs(r.lat - lat) < 0.0003 && Math.abs(r.lng - lon) < 0.0003)
-            if (!isDuplicate) {
-              results.push({
-                id: `nom-${item.place_id}-${Math.random()}`,
-                title,
-                display_name: item.display_name,
-                lat,
-                lng: lon,
-                city,
-                state,
-                pincode,
-                suburbOrSociety: title
-              })
-            }
-          })
-        }
-      }
-
-      processNomData(nomPrimaryData)
-      processNomData(nomSanitizedData)
 
       setSuggestions(results)
       setShowSuggestions(true)

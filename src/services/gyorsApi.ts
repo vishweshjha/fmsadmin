@@ -1418,3 +1418,42 @@ export async function deleteBanner(id: string): Promise<void> {
   const res = await apiClient.delete(API_ENDPOINTS.BANNERS.DELETE(id))
   if (!res.success) throw new Error(res.error?.message || 'Failed to delete banner')
 }
+
+// ─── Cancellation Reasons ─────────────────────────────────────────────────────
+
+export interface AdminCancellationReason {
+  id: string
+  reason: string
+  isActive: boolean
+  sortOrder: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+export async function fetchCancellationReasons(admin = true): Promise<AdminCancellationReason[]> {
+  const endpoint = admin ? API_ENDPOINTS.CANCELLATION_REASONS.ADMIN_LIST : API_ENDPOINTS.CANCELLATION_REASONS.LIST
+  const res = await apiClient.get<AdminCancellationReason[]>(endpoint)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to load cancellation reasons')
+  return res.data || []
+}
+
+export async function createCancellationReason(reason: string, sortOrder = 0): Promise<AdminCancellationReason> {
+  const res = await apiClient.post<AdminCancellationReason>(API_ENDPOINTS.CANCELLATION_REASONS.CREATE, { reason, sortOrder })
+  if (!res.success) throw new Error(res.error?.message || 'Failed to create cancellation reason')
+  return res.data!
+}
+
+export async function updateCancellationReason(
+  id: string,
+  data: Partial<{ reason: string; isActive: boolean; sortOrder: number }>
+): Promise<AdminCancellationReason> {
+  const res = await apiClient.patch<AdminCancellationReason>(API_ENDPOINTS.CANCELLATION_REASONS.UPDATE(id), data)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to update cancellation reason')
+  return res.data!
+}
+
+export async function deleteCancellationReason(id: string): Promise<void> {
+  const res = await apiClient.delete(API_ENDPOINTS.CANCELLATION_REASONS.DELETE(id))
+  if (!res.success) throw new Error(res.error?.message || 'Failed to delete cancellation reason')
+}
+
