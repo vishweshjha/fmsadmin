@@ -1457,3 +1457,56 @@ export async function deleteCancellationReason(id: string): Promise<void> {
   if (!res.success) throw new Error(res.error?.message || 'Failed to delete cancellation reason')
 }
 
+// ─── Help Cards (One Help Who Can Do It All) ──────────────────────────────────
+
+export interface AdminHelpCard {
+  id: string
+  serviceItemId?: string
+  serviceItem?: { id: string; name: string; categoryId?: string }
+  title: string
+  description: string
+  imageUrl?: string
+  coveredActivities: string[]
+  excludedActivities: string[]
+  dos: string[]
+  donts: string[]
+  isActive: boolean
+  orderIndex?: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+export async function fetchHelpCards(admin = true): Promise<AdminHelpCard[]> {
+  const endpoint = admin ? API_ENDPOINTS.HELP_CARDS.ADMIN_LIST : API_ENDPOINTS.HELP_CARDS.LIST
+  const res = await apiClient.get<AdminHelpCard[]>(endpoint)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to load help cards')
+  return res.data || []
+}
+
+export async function createHelpCard(data: Omit<AdminHelpCard, 'id' | 'createdAt' | 'updatedAt' | 'serviceItem'>): Promise<AdminHelpCard> {
+  const res = await apiClient.post<AdminHelpCard>(API_ENDPOINTS.HELP_CARDS.CREATE, data)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to create help card')
+  return res.data!
+}
+
+export async function updateHelpCard(
+  id: string,
+  data: Partial<AdminHelpCard>
+): Promise<AdminHelpCard> {
+  const res = await apiClient.patch<AdminHelpCard>(API_ENDPOINTS.HELP_CARDS.UPDATE(id), data)
+  if (!res.success) throw new Error(res.error?.message || 'Failed to update help card')
+  return res.data!
+}
+
+export async function toggleHelpCardStatus(id: string, isActive: boolean): Promise<AdminHelpCard> {
+  const res = await apiClient.patch<AdminHelpCard>(API_ENDPOINTS.HELP_CARDS.TOGGLE(id), { isActive })
+  if (!res.success) throw new Error(res.error?.message || 'Failed to toggle help card status')
+  return res.data!
+}
+
+export async function deleteHelpCard(id: string): Promise<void> {
+  const res = await apiClient.delete(API_ENDPOINTS.HELP_CARDS.DELETE(id))
+  if (!res.success) throw new Error(res.error?.message || 'Failed to delete help card')
+}
+
+

@@ -148,6 +148,16 @@ export const API_ENDPOINTS = {
     UPDATE: (id: string) => `${BASE_URL}/cancellation-reasons/${id}`,
     DELETE: (id: string) => `${BASE_URL}/cancellation-reasons/${id}`,
   },
+
+  // Admin - Help Cards (Who Can Do It All)
+  HELP_CARDS: {
+    LIST: `${BASE_URL}/help-cards`,
+    ADMIN_LIST: `${BASE_URL}/help-cards/admin`,
+    CREATE: `${BASE_URL}/help-cards`,
+    UPDATE: (id: string) => `${BASE_URL}/help-cards/${id}`,
+    TOGGLE: (id: string) => `${BASE_URL}/help-cards/${id}/status`,
+    DELETE: (id: string) => `${BASE_URL}/help-cards/${id}`,
+  },
 } as const
 
 export default API_ENDPOINTS
