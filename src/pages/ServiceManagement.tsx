@@ -8,7 +8,8 @@ import {
   HelpCircle,
   Trash2,
   Edit3,
-  Sparkles
+  Sparkles,
+  Clock
 } from 'lucide-react'
 import apiClient from '../services/apiClient'
 import {
@@ -31,6 +32,12 @@ interface ServiceCategory {
   }
 }
 
+export interface ServiceDurationOption {
+  minutes: number
+  label: string
+  price: number | string
+}
+
 interface ServiceItem {
   id: string
   name: string
@@ -40,6 +47,7 @@ interface ServiceItem {
   category?: ServiceCategory
   durationMinutes: number
   imageUrl?: string
+  durations?: ServiceDurationOption[]
 }
 
 export default function ServiceManagement() {
@@ -79,7 +87,8 @@ export default function ServiceManagement() {
     price: '',
     categoryId: '',
     durationMinutes: 60,
-    imageUrl: ''
+    imageUrl: '',
+    durations: [] as ServiceDurationOption[]
   })
 
   useEffect(() => {
@@ -211,13 +220,25 @@ export default function ServiceManagement() {
 
   const handleEditItem = (item: ServiceItem) => {
     setEditingItem(item)
+    let parsedDurations: ServiceDurationOption[] = []
+    if (Array.isArray(item.durations)) {
+      parsedDurations = item.durations
+    } else if (typeof item.durations === 'string') {
+      try {
+        parsedDurations = JSON.parse(item.durations)
+      } catch (e) {
+        console.error('Failed to parse durations:', e)
+      }
+    }
+
     setNewItem({
       name: item.name,
       description: item.description,
       price: item.price.toString(),
       categoryId: item.categoryId,
       durationMinutes: item.durationMinutes,
-      imageUrl: item.imageUrl || ''
+      imageUrl: item.imageUrl || '',
+      durations: parsedDurations
     })
     setShowItemModal(true)
   }
@@ -231,16 +252,24 @@ export default function ServiceManagement() {
       price: '',
       categoryId: '',
       durationMinutes: 60,
-      imageUrl: ''
+      imageUrl: '',
+      durations: []
     })
   }
 
   const handleCreateItem = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
+      const sanitizedDurations = (newItem.durations || []).map(d => ({
+        minutes: Number(d.minutes),
+        label: (d.label || '').trim() || `${d.minutes} min`,
+        price: Number(d.price) || 0
+      }))
+
       const payload = {
         ...newItem,
-        price: parseFloat(newItem.price as string)
+        price: parseFloat(newItem.price as string),
+        durations: sanitizedDurations
       }
 
       let response
@@ -257,6 +286,73 @@ export default function ServiceManagement() {
     } catch (error) {
       console.error('Error saving service item:', error)
     }
+  }
+
+  const handleAddDurationPreset = (minutes: number, label: string) => {
+    const baseP = parseFloat(newItem.price as string) || 299
+    const baseMins = newItem.durationMinutes || 60
+    const calculatedPrice = Math.round((baseP / baseMins) * minutes)
+
+    const exists = (newItem.durations || []).some(d => d.minutes === minutes)
+    if (exists) {
+      alert(`Duration "${label}" (${minutes} min) is already in the list.`)
+      return
+    }
+
+    const updated = [
+      ...(newItem.durations || []),
+      { minutes, label, price: calculatedPrice }
+    ].sort((a, b) => a.minutes - b.minutes)
+
+    setNewItem({ ...newItem, durations: updated })
+  }
+
+  const handleAutoGenerateTiers = () => {
+    const baseP = parseFloat(newItem.price as string) || 299
+    const baseMins = newItem.durationMinutes || 60
+    const calc = (mins: number) => Math.round((baseP / baseMins) * mins)
+
+    const tiers: ServiceDurationOption[] = [
+      { minutes: 60, label: '60 min', price: calc(60) },
+      { minutes: 90, label: '90 min', price: calc(90) },
+      { minutes: 120, label: '2 hrs', price: calc(120) },
+      { minutes: 150, label: '2.5 hrs', price: calc(150) },
+      { minutes: 180, label: '3 hrs', price: calc(180) },
+      { minutes: 210, label: '3.5 hrs', price: calc(210) },
+      { minutes: 240, label: '4 hrs', price: calc(240) },
+    ]
+
+    setNewItem({ ...newItem, durations: tiers })
+  }
+
+  const handleUpdateDurationTier = (index: number, field: keyof ServiceDurationOption, value: any) => {
+    const updated = [...(newItem.durations || [])]
+    updated[index] = { ...updated[index], [field]: value }
+    setNewItem({ ...newItem, durations: updated })
+  }
+
+  const handleRemoveDurationTier = (index: number) => {
+    const updated = (newItem.durations || []).filter((_, i) => i !== index)
+    setNewItem({ ...newItem, durations: updated })
+  }
+
+  const handleAddCustomDuration = () => {
+    const currentCount = (newItem.durations || []).length
+    const nextMins = currentCount > 0 ? (newItem.durations[currentCount - 1].minutes + 30) : 60
+    const nextLabel = nextMins >= 60 && nextMins % 60 === 0 
+      ? `${nextMins / 60} hrs` 
+      : nextMins >= 60 
+        ? `${(nextMins / 60).toFixed(1)} hrs` 
+        : `${nextMins} min`
+    const baseP = parseFloat(newItem.price as string) || 299
+    const baseMins = newItem.durationMinutes || 60
+    const price = Math.round((baseP / baseMins) * nextMins)
+
+    const updated = [
+      ...(newItem.durations || []),
+      { minutes: nextMins, label: nextLabel, price }
+    ]
+    setNewItem({ ...newItem, durations: updated })
   }
 
   return (
@@ -428,7 +524,23 @@ export default function ServiceManagement() {
                     <span className="text-sm font-semibold text-gray-900">₹{item.price}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-sm text-gray-500">{item.durationMinutes} min</span>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-gray-800">{item.durationMinutes} min base</span>
+                      {(() => {
+                        let count = 0
+                        if (Array.isArray(item.durations)) count = item.durations.length
+                        else if (typeof item.durations === 'string') {
+                          try { count = JSON.parse(item.durations).length } catch (e) {}
+                        }
+                        return count > 0 ? (
+                          <span className="inline-block mt-1 text-[11px] px-2 py-0.5 bg-purple-50 text-purple-700 rounded-md font-semibold border border-purple-200 w-fit">
+                            ⚡ {count} duration rates
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-gray-400 mt-0.5">Single rate</span>
+                        )
+                      })()}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <button 
@@ -663,14 +775,17 @@ export default function ServiceManagement() {
       {/* Service Item Modal */}
       {showItemModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-xl animate-in fade-in zoom-in duration-200">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="text-lg font-bold">{editingItem ? 'Edit Service Item' : 'Add Service Item'}</h3>
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">{editingItem ? 'Edit Service Item' : 'Add Service Item'}</h3>
+                <p className="text-xs text-gray-500">Configure service details and dynamic duration rates</p>
+              </div>
               <button onClick={handleCloseItemModal} className="text-gray-400 hover:text-gray-600">
                 <XCircle size={24} />
               </button>
             </div>
-            <form onSubmit={handleCreateItem} className="p-6 space-y-4">
+            <form onSubmit={handleCreateItem} className="p-6 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Service Name</label>
                 <input
@@ -698,7 +813,7 @@ export default function ServiceManagement() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Base Price (₹)</label>
                   <input
                     type="number"
                     required
@@ -709,15 +824,145 @@ export default function ServiceManagement() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Duration (min)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Base Duration (min)</label>
                   <input
                     type="number"
                     required
                     value={newItem.durationMinutes}
-                    onChange={(e) => setNewItem({ ...newItem, durationMinutes: parseInt(e.target.value) })}
+                    onChange={(e) => setNewItem({ ...newItem, durationMinutes: parseInt(e.target.value) || 60 })}
                     className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black outline-none transition-all"
                     placeholder="60"
                   />
+                </div>
+              </div>
+
+              {/* Dynamic Service Durations & Rates (Visible to Customer) */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock size={16} className="text-black" />
+                    <span className="text-sm font-bold text-gray-900">Service Duration Options & Rates</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAutoGenerateTiers}
+                    className="text-xs bg-black text-white hover:bg-gray-800 px-3 py-1 rounded-md font-medium transition shadow-sm"
+                  >
+                    ✨ Auto-Generate All Tiers
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Configure how many durations should be displayed to the customer (e.g. 60 min, 90 min, 2 hrs, 2.5 hrs, 3 hrs, 3.5 hrs, 4 hrs) with their specific prices.
+                </p>
+
+                {/* Quick Presets */}
+                <div>
+                  <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1.5">
+                    Click to Add Duration Presets:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { minutes: 60, label: '60 min' },
+                      { minutes: 90, label: '90 min' },
+                      { minutes: 120, label: '2 hrs' },
+                      { minutes: 150, label: '2.5 hrs' },
+                      { minutes: 180, label: '3 hrs' },
+                      { minutes: 210, label: '3.5 hrs' },
+                      { minutes: 240, label: '4 hrs' },
+                    ].map(preset => {
+                      const alreadyAdded = (newItem.durations || []).some(d => d.minutes === preset.minutes)
+                      return (
+                        <button
+                          key={preset.minutes}
+                          type="button"
+                          disabled={alreadyAdded}
+                          onClick={() => handleAddDurationPreset(preset.minutes, preset.label)}
+                          className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition ${
+                            alreadyAdded 
+                              ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                              : 'bg-white text-gray-700 border-gray-300 hover:border-black hover:text-black'
+                          }`}
+                        >
+                          + {preset.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Configured Durations List */}
+                <div className="space-y-2 pt-1">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-semibold text-gray-700">
+                      Active Customer Duration Tiers ({newItem.durations?.length || 0})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAddCustomDuration}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                    >
+                      <Plus size={13} /> Add Custom Duration
+                    </button>
+                  </div>
+
+                  {(!newItem.durations || newItem.durations.length === 0) ? (
+                    <div className="text-center py-4 bg-white rounded-lg border border-dashed border-gray-300 text-xs text-gray-500">
+                      No custom duration tiers added yet. Default single base rate will be shown.
+                      <div className="mt-1 text-[11px] text-gray-400">
+                        Click preset buttons above or &quot;Auto-Generate All Tiers&quot; to configure multiple duration options for customers!
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                      {newItem.durations.map((tier, idx) => (
+                        <div key={idx} className="flex items-center gap-2 bg-white p-2.5 rounded-lg border border-gray-200 shadow-sm">
+                          <div className="w-24">
+                            <label className="text-[10px] text-gray-400 font-semibold uppercase block">Minutes</label>
+                            <input
+                              type="number"
+                              required
+                              value={tier.minutes}
+                              onChange={(e) => handleUpdateDurationTier(idx, 'minutes', parseInt(e.target.value) || 0)}
+                              className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-black outline-none"
+                              placeholder="60"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label className="text-[10px] text-gray-400 font-semibold uppercase block">Customer Label</label>
+                            <input
+                              type="text"
+                              required
+                              value={tier.label}
+                              onChange={(e) => handleUpdateDurationTier(idx, 'label', e.target.value)}
+                              className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-black outline-none"
+                              placeholder="e.g. 60 min, 2 hrs"
+                            />
+                          </div>
+                          <div className="w-28">
+                            <label className="text-[10px] text-gray-400 font-semibold uppercase block">Rate (₹)</label>
+                            <input
+                              type="number"
+                              required
+                              value={tier.price}
+                              onChange={(e) => handleUpdateDurationTier(idx, 'price', parseFloat(e.target.value) || 0)}
+                              className="w-full px-2 py-1 text-xs border border-gray-200 rounded font-bold text-gray-900 focus:ring-1 focus:ring-black outline-none"
+                              placeholder="299"
+                            />
+                          </div>
+                          <div className="pt-3">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDurationTier(idx)}
+                              className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition"
+                              title="Remove tier"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               <div>
