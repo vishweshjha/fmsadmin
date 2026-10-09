@@ -14,7 +14,8 @@ import {
   Globe,
   Loader2,
   X,
-  Compass
+  Compass,
+  Utensils
 } from 'lucide-react'
 import { apiClient } from '../services/apiClient'
 
@@ -43,6 +44,8 @@ interface ServiceableLocation {
   state: string
   pincode: string
   isActive: boolean
+  isCookEnabled?: boolean
+  categories?: string[]
   createdAt?: string
 }
 
@@ -282,6 +285,7 @@ export default function ServiceabilityManagement() {
   const [stateName, setStateName] = useState('')
   const [pincode, setPincode] = useState('')
   const [isActive, setIsActive] = useState(true)
+  const [isCookEnabled, setIsCookEnabled] = useState(true)
 
   // Search Box State for Map
   const [searchQuery, setSearchQuery] = useState('')
@@ -652,6 +656,7 @@ export default function ServiceabilityManagement() {
     setStateName('Delhi')
     setPincode('110001')
     setIsActive(true)
+    setIsCookEnabled(true)
     setSearchQuery('')
     setSuggestions([])
     setErrorMsg('')
@@ -670,6 +675,7 @@ export default function ServiceabilityManagement() {
     setStateName(loc.state)
     setPincode(loc.pincode)
     setIsActive(loc.isActive)
+    setIsCookEnabled(loc.isCookEnabled !== false)
     setSearchQuery(loc.address)
     setSuggestions([])
     setErrorMsg('')
@@ -702,6 +708,8 @@ export default function ServiceabilityManagement() {
       state: stateName.trim() || 'Delhi',
       pincode: pincode.trim() || '110001',
       isActive,
+      isCookEnabled,
+      categories: isCookEnabled ? ['Gyors Help', 'Gyors Cook'] : ['Gyors Help'],
     }
 
     try {
@@ -739,6 +747,25 @@ export default function ServiceabilityManagement() {
       }
     } catch (e) {
       console.warn('Error toggling status:', e)
+    }
+  }
+
+  const handleToggleCookStatus = async (loc: ServiceableLocation) => {
+    const nextCook = loc.isCookEnabled === false ? true : false
+    try {
+      const res = await apiClient.put<ServiceableLocation>(`/admin/serviceable-locations/${loc.id}`, {
+        isCookEnabled: nextCook,
+        categories: nextCook ? ['Gyors Help', 'Gyors Cook'] : ['Gyors Help'],
+      })
+      if (res.success) {
+        setLocations(prev =>
+          prev.map(l => (l.id === loc.id ? { ...l, isCookEnabled: nextCook } : l))
+        )
+      } else {
+        alert(res.error?.message || 'Failed to update Gyors Cook status')
+      }
+    } catch (e) {
+      console.warn('Error toggling Gyors Cook status:', e)
     }
   }
 
@@ -854,6 +881,7 @@ export default function ServiceabilityManagement() {
                   <th className="px-6 py-3.5">City / Pincode</th>
                   <th className="px-6 py-3.5">Coordinates</th>
                   <th className="px-6 py-3.5">Status</th>
+                  <th className="px-6 py-3.5">Gyors Cook</th>
                   <th className="px-6 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
@@ -897,6 +925,20 @@ export default function ServiceabilityManagement() {
                       >
                         {loc.isActive ? <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> : <XCircle className="w-3.5 h-3.5 text-gray-400" />}
                         <span>{loc.isActive ? 'Active' : 'Inactive'}</span>
+                      </button>
+                    </td>
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => handleToggleCookStatus(loc)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                          loc.isCookEnabled !== false
+                            ? 'bg-pink-100 text-pink-700 hover:bg-pink-200 border border-pink-200'
+                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200 border border-gray-200'
+                        }`}
+                        title={loc.isCookEnabled !== false ? 'Click to disable Gyors Cook for this location' : 'Click to enable Gyors Cook for this location'}
+                      >
+                        <Utensils className={`w-3.5 h-3.5 ${loc.isCookEnabled !== false ? 'text-pink-600' : 'text-gray-400'}`} />
+                        <span>{loc.isCookEnabled !== false ? 'Cook Live' : 'Cook Disabled'}</span>
                       </button>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -1141,6 +1183,34 @@ export default function ServiceabilityManagement() {
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                       isActive ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Gyors Cook Category Enablement Toggle */}
+              <div className="flex items-center justify-between p-4 bg-pink-50/70 rounded-xl border border-pink-200">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-pink-100 rounded-lg text-pink-600 mt-0.5">
+                    <Utensils className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-gray-900">Gyors Cook Category Availability</div>
+                    <div className="text-xs text-gray-500 max-w-sm">
+                      Enable to show "Home Cooks in 10 min" bottom popup on home page and allow instant/scheduled cook bookings for this specific society or address.
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCookEnabled(!isCookEnabled)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    isCookEnabled ? 'bg-pink-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      isCookEnabled ? 'translate-x-6' : 'translate-x-1'
                     }`}
                   />
                 </button>
