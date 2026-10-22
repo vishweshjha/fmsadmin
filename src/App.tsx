@@ -26,6 +26,7 @@ import IncentivesPenalties from './pages/IncentivesPenalties'
 import PayrollSettlement from './pages/PayrollSettlement'
 import PayrollReports from './pages/PayrollReports'
 import ServiceabilityManagement from './pages/ServiceabilityManagement'
+import CookTimeGuideManagement from './pages/CookTimeGuideManagement'
 import { UserRole } from './context/AuthContext'
 
 // Role-based route permissions
@@ -35,6 +36,7 @@ const rolePermissions: Record<string, UserRole[]> = {
   '/providers': ['Super Admin', 'Operations Admin', 'Admin'],
   '/services': ['Super Admin', 'Operations Admin', 'Admin'],
   '/serviceability': ['Super Admin', 'Operations Admin', 'Admin'],
+  '/cook-time-guide': ['Super Admin', 'Operations Admin', 'Admin'],
   '/kyc': ['Super Admin', 'Compliance Officer'],
   '/bookings': ['Super Admin', 'Operations Admin', 'Support Agent'],
   '/pricing': ['Super Admin', 'Finance Admin'],
@@ -269,6 +271,16 @@ function AppRoutes() {
           <ProtectedRoute requiredRoles={rolePermissions['/serviceability']}>
             <Layout>
               <ServiceabilityManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/cook-time-guide"
+        element={
+          <ProtectedRoute requiredRoles={rolePermissions['/cook-time-guide']}>
+            <Layout>
+              <CookTimeGuideManagement />
             </Layout>
           </ProtectedRoute>
         }

@@ -36,6 +36,10 @@ export interface ServiceDurationOption {
   minutes: number
   label: string
   price: number | string
+  originalPrice?: number | string
+  peopleText?: string
+  dishesText?: string
+  isSoldOut?: boolean
 }
 
 interface ServiceItem {
@@ -263,7 +267,11 @@ export default function ServiceManagement() {
       const sanitizedDurations = (newItem.durations || []).map(d => ({
         minutes: Number(d.minutes),
         label: (d.label || '').trim() || `${d.minutes} min`,
-        price: Number(d.price) || 0
+        price: Number(d.price) || 0,
+        originalPrice: d.originalPrice != null && Number(d.originalPrice) > 0 ? Number(d.originalPrice) : undefined,
+        peopleText: (d.peopleText || '').trim() || undefined,
+        dishesText: (d.dishesText || '').trim() || undefined,
+        isSoldOut: d.isSoldOut === true,
       }))
 
       const payload = {
@@ -323,6 +331,19 @@ export default function ServiceManagement() {
     ]
 
     setNewItem({ ...newItem, durations: tiers })
+  }
+
+  const handleAutoGenerateCookTiers = () => {
+    const cookTiers: ServiceDurationOption[] = [
+      { minutes: 60, label: '60 min', price: 99, originalPrice: 299, peopleText: '1-2', dishesText: '2', isSoldOut: false },
+      { minutes: 90, label: '90 min', price: 159, originalPrice: 449, peopleText: '2-3', dishesText: '2', isSoldOut: false },
+      { minutes: 120, label: '2 hrs', price: 209, originalPrice: 599, peopleText: '4-5', dishesText: '3', isSoldOut: false },
+      { minutes: 150, label: '2.5 hrs', price: 259, originalPrice: 749, peopleText: '5-6', dishesText: '3', isSoldOut: false },
+      { minutes: 180, label: '3 hrs', price: 309, originalPrice: 899, peopleText: '6-7', dishesText: '4', isSoldOut: false },
+      { minutes: 210, label: '3.5 hrs', price: 359, originalPrice: 999, peopleText: '6-7', dishesText: '4', isSoldOut: true },
+      { minutes: 240, label: '4 hrs', price: 409, originalPrice: 1099, peopleText: '7-8', dishesText: '5', isSoldOut: true },
+    ]
+    setNewItem({ ...newItem, durations: cookTiers })
   }
 
   const handleUpdateDurationTier = (index: number, field: keyof ServiceDurationOption, value: any) => {
@@ -843,13 +864,23 @@ export default function ServiceManagement() {
                     <Clock size={16} className="text-black" />
                     <span className="text-sm font-bold text-gray-900">Service Duration Options & Rates</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleAutoGenerateTiers}
-                    className="text-xs bg-black text-white hover:bg-gray-800 px-3 py-1 rounded-md font-medium transition shadow-sm"
-                  >
-                    ✨ Auto-Generate All Tiers
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleAutoGenerateCookTiers}
+                      className="text-xs bg-pink-50 text-pink-700 hover:bg-pink-100 border border-pink-200 px-3 py-1 rounded-md font-semibold transition shadow-sm"
+                      title="Apply Cook screenshot 7-tier schedule configuration (People, Dishes, Rates, Sold Out)"
+                    >
+                      🍲 Cook Schedule Preset
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAutoGenerateTiers}
+                      className="text-xs bg-black text-white hover:bg-gray-800 px-3 py-1 rounded-md font-medium transition shadow-sm"
+                    >
+                      ✨ Auto-Generate All Tiers
+                    </button>
+                  </div>
                 </div>
                 <p className="text-xs text-gray-500">
                   Configure how many durations should be displayed to the customer (e.g. 60 min, 90 min, 2 hrs, 2.5 hrs, 3 hrs, 3.5 hrs, 4 hrs) with their specific prices.
@@ -915,49 +946,94 @@ export default function ServiceManagement() {
                   ) : (
                     <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                       {newItem.durations.map((tier, idx) => (
-                        <div key={idx} className="flex items-center gap-2 bg-white p-2.5 rounded-lg border border-gray-200 shadow-sm">
-                          <div className="w-24">
-                            <label className="text-[10px] text-gray-400 font-semibold uppercase block">Minutes</label>
-                            <input
-                              type="number"
-                              required
-                              value={tier.minutes}
-                              onChange={(e) => handleUpdateDurationTier(idx, 'minutes', parseInt(e.target.value) || 0)}
-                              className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-black outline-none"
-                              placeholder="60"
-                            />
+                        <div key={idx} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-20">
+                              <label className="text-[10px] text-gray-400 font-semibold uppercase block">Minutes</label>
+                              <input
+                                type="number"
+                                required
+                                value={tier.minutes}
+                                onChange={(e) => handleUpdateDurationTier(idx, 'minutes', parseInt(e.target.value) || 0)}
+                                className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-black outline-none"
+                                placeholder="60"
+                              />
+                            </div>
+                            <div className="flex-1 min-w-[90px]">
+                              <label className="text-[10px] text-gray-400 font-semibold uppercase block">Label</label>
+                              <input
+                                type="text"
+                                required
+                                value={tier.label}
+                                onChange={(e) => handleUpdateDurationTier(idx, 'label', e.target.value)}
+                                className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-black outline-none"
+                                placeholder="60 min"
+                              />
+                            </div>
+                            <div className="w-20">
+                              <label className="text-[10px] text-gray-400 font-semibold uppercase block">Rate (₹)</label>
+                              <input
+                                type="number"
+                                required
+                                value={tier.price}
+                                onChange={(e) => handleUpdateDurationTier(idx, 'price', parseFloat(e.target.value) || 0)}
+                                className="w-full px-2 py-1 text-xs border border-gray-200 rounded font-bold text-gray-900 focus:ring-1 focus:ring-black outline-none"
+                                placeholder="99"
+                              />
+                            </div>
+                            <div className="w-20">
+                              <label className="text-[10px] text-gray-400 font-semibold uppercase block">Orig ₹</label>
+                              <input
+                                type="number"
+                                value={tier.originalPrice ?? ''}
+                                onChange={(e) => handleUpdateDurationTier(idx, 'originalPrice', e.target.value ? parseFloat(e.target.value) : undefined)}
+                                className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-500 focus:ring-1 focus:ring-black outline-none"
+                                placeholder="299"
+                              />
+                            </div>
+                            <div className="pt-3">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveDurationTier(idx)}
+                                className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition"
+                                title="Remove tier"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
                           </div>
-                          <div className="flex-1">
-                            <label className="text-[10px] text-gray-400 font-semibold uppercase block">Customer Label</label>
-                            <input
-                              type="text"
-                              required
-                              value={tier.label}
-                              onChange={(e) => handleUpdateDurationTier(idx, 'label', e.target.value)}
-                              className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-black outline-none"
-                              placeholder="e.g. 60 min, 2 hrs"
-                            />
-                          </div>
-                          <div className="w-28">
-                            <label className="text-[10px] text-gray-400 font-semibold uppercase block">Rate (₹)</label>
-                            <input
-                              type="number"
-                              required
-                              value={tier.price}
-                              onChange={(e) => handleUpdateDurationTier(idx, 'price', parseFloat(e.target.value) || 0)}
-                              className="w-full px-2 py-1 text-xs border border-gray-200 rounded font-bold text-gray-900 focus:ring-1 focus:ring-black outline-none"
-                              placeholder="299"
-                            />
-                          </div>
-                          <div className="pt-3">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveDurationTier(idx)}
-                              className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition"
-                              title="Remove tier"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+
+                          {/* Extra Dynamic Metadata: People, Dishes, Sold Out */}
+                          <div className="flex items-center gap-3 pt-1 border-t border-gray-100 text-xs">
+                            <div className="flex items-center gap-1.5 flex-1">
+                              <span className="text-[11px] text-gray-500 font-medium">👤 Person:</span>
+                              <input
+                                type="text"
+                                value={tier.peopleText || ''}
+                                onChange={(e) => handleUpdateDurationTier(idx, 'peopleText', e.target.value)}
+                                className="flex-1 px-2 py-0.5 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-black outline-none"
+                                placeholder="e.g. 1-2, 4-5"
+                              />
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-1">
+                              <span className="text-[11px] text-gray-500 font-medium">🍲 Dishes:</span>
+                              <input
+                                type="text"
+                                value={tier.dishesText || ''}
+                                onChange={(e) => handleUpdateDurationTier(idx, 'dishesText', e.target.value)}
+                                className="flex-1 px-2 py-0.5 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-black outline-none"
+                                placeholder="e.g. 2, 3, 4"
+                              />
+                            </div>
+                            <label className="flex items-center gap-1 text-[11px] font-medium text-gray-600 cursor-pointer pl-1">
+                              <input
+                                type="checkbox"
+                                checked={tier.isSoldOut === true}
+                                onChange={(e) => handleUpdateDurationTier(idx, 'isSoldOut', e.target.checked)}
+                                className="rounded text-pink-600 focus:ring-pink-500"
+                              />
+                              <span className={tier.isSoldOut ? 'text-red-600 font-semibold' : ''}>Sold Out</span>
+                            </label>
                           </div>
                         </div>
                       ))}
