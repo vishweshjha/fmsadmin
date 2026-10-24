@@ -1466,10 +1466,10 @@ export interface AdminHelpCard {
   title: string
   description: string
   imageUrl?: string
-  coveredActivities: string[]
-  excludedActivities: string[]
-  dos: string[]
-  donts: string[]
+  coveredActivities: (string | { title?: string; name?: string; text?: string; imageUrl?: string })[]
+  excludedActivities: (string | { title?: string; name?: string; text?: string; imageUrl?: string })[]
+  dos: (string | { title?: string; name?: string; text?: string })[]
+  donts: (string | { title?: string; name?: string; text?: string })[]
   isActive: boolean
   orderIndex?: number
   createdAt?: string

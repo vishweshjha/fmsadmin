@@ -56,6 +56,33 @@ interface ServiceItem {
   durations?: ServiceDurationOption[]
 }
 
+const getFullImageUrl = (url?: string) => {
+  if (!url) return ''
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url
+  const backendOrigin = 'https://gyors-backend-311476989793.us-central1.run.app'
+  return `${backendOrigin}${url.startsWith('/') ? '' : '/'}${url}`
+}
+
+const parseActivityItems = (raw: any): any[] => {
+  if (Array.isArray(raw)) return raw
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed
+    } catch {}
+  }
+  return []
+}
+
+const getActivityLabel = (item: any): string => {
+  if (!item) return ''
+  if (typeof item === 'string') return item.trim()
+  if (typeof item === 'object') {
+    return (item.title || item.name || item.text || item.description || '').trim()
+  }
+  return String(item).trim()
+}
+
 export default function ServiceManagement() {
   const navigate = useNavigate()
   const [categories, setCategories] = useState<ServiceCategory[]>([])
@@ -134,15 +161,20 @@ export default function ServiceManagement() {
 
   const handleEditHelpCard = (card: AdminHelpCard) => {
     setEditingHelpCard(card)
+    const extractText = (val: any) => {
+      const arr = parseActivityItems(val)
+      return arr.map((item: any) => getActivityLabel(item)).filter(Boolean).join('\n')
+    }
+
     setHelpCardForm({
       serviceItemId: card.serviceItemId || '',
       title: card.title || '',
       description: card.description || '',
       imageUrl: card.imageUrl || '',
-      coveredActivitiesText: Array.isArray(card.coveredActivities) ? card.coveredActivities.join('\n') : '',
-      excludedActivitiesText: Array.isArray(card.excludedActivities) ? card.excludedActivities.join('\n') : '',
-      dosText: Array.isArray(card.dos) ? card.dos.join('\n') : '',
-      dontsText: Array.isArray(card.donts) ? card.donts.join('\n') : '',
+      coveredActivitiesText: extractText(card.coveredActivities),
+      excludedActivitiesText: extractText(card.excludedActivities),
+      dosText: extractText(card.dos),
+      dontsText: extractText(card.donts),
       isActive: card.isActive ?? true,
     })
     setShowHelpCardModal(true)
@@ -168,13 +200,33 @@ export default function ServiceManagement() {
     e.preventDefault()
     try {
       const parseLines = (text: string) => text.split('\n').map(s => s.trim()).filter(Boolean)
+      
+      const existingCovered = editingHelpCard ? parseActivityItems(editingHelpCard.coveredActivities) : []
+      const existingExcluded = editingHelpCard ? parseActivityItems(editingHelpCard.excludedActivities) : []
+
+      const covered = parseLines(helpCardForm.coveredActivitiesText).map((line, idx) => {
+        const found = existingCovered.find((ex: any) => getActivityLabel(ex) === line) || existingCovered[idx]
+        return {
+          title: line,
+          imageUrl: found && typeof found === 'object' && found.imageUrl ? found.imageUrl : ''
+        }
+      })
+
+      const excluded = parseLines(helpCardForm.excludedActivitiesText).map((line, idx) => {
+        const found = existingExcluded.find((ex: any) => getActivityLabel(ex) === line) || existingExcluded[idx]
+        return {
+          title: line,
+          imageUrl: found && typeof found === 'object' && found.imageUrl ? found.imageUrl : ''
+        }
+      })
+
       const payload = {
         serviceItemId: helpCardForm.serviceItemId || undefined,
         title: helpCardForm.title.trim(),
         description: helpCardForm.description.trim(),
         imageUrl: helpCardForm.imageUrl || undefined,
-        coveredActivities: parseLines(helpCardForm.coveredActivitiesText),
-        excludedActivities: parseLines(helpCardForm.excludedActivitiesText),
+        coveredActivities: covered,
+        excludedActivities: excluded,
         dos: parseLines(helpCardForm.dosText),
         donts: parseLines(helpCardForm.dontsText),
         isActive: helpCardForm.isActive,
@@ -597,7 +649,7 @@ export default function ServiceManagement() {
       ) : (
         /* Help Cards (Who Can Do It All) Grid View */
         <div className="space-y-6">
-          {helpCards.length === 0 ? (
+          {!Array.isArray(helpCards) || helpCards.length === 0 ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
               <HelpCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <h3 className="text-lg font-bold text-gray-900 mb-1">No Help Cards Created Yet</h3>
@@ -628,17 +680,29 @@ export default function ServiceManagement() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {helpCards.map((card) => {
-                const covered = Array.isArray(card.coveredActivities) ? card.coveredActivities : []
-                const excluded = Array.isArray(card.excludedActivities) ? card.excludedActivities : []
-                const dos = Array.isArray(card.dos) ? card.dos : []
-                const donts = Array.isArray(card.donts) ? card.donts : []
+                const covered = parseActivityItems(card.coveredActivities)
+                const excluded = parseActivityItems(card.excludedActivities)
+                const dos = parseActivityItems(card.dos)
+                const donts = parseActivityItems(card.donts)
+
+                const linkedServiceName =
+                  card.serviceItem?.name ||
+                  serviceItems.find((s) => s.id === card.serviceItemId)?.name ||
+                  'All Services'
 
                 return (
                   <div key={card.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
                     {/* Header Image & Badge */}
                     <div className="relative h-44 bg-gray-100 border-b border-gray-100">
                       {card.imageUrl ? (
-                        <img src={card.imageUrl} alt={card.title} className="w-full h-full object-cover" />
+                        <img
+                          src={getFullImageUrl(card.imageUrl)}
+                          alt={card.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            ;(e.target as HTMLElement).style.display = 'none'
+                          }}
+                        />
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 bg-gray-50">
                           <HelpCircle size={40} />
@@ -658,7 +722,7 @@ export default function ServiceManagement() {
 
                       {/* Linked Service Item Badge */}
                       <div className="absolute bottom-3 left-3 bg-black/80 backdrop-blur-sm text-white px-3 py-1 rounded-md text-xs font-semibold max-w-[85%] truncate">
-                        🏷️ {card.serviceItem?.name || 'All Services'}
+                        🏷️ {linkedServiceName}
                       </div>
                     </div>
 
@@ -676,11 +740,15 @@ export default function ServiceManagement() {
                             <CheckCircle size={12} /> Covered ({covered.length})
                           </p>
                           <div className="flex flex-wrap gap-1.5">
-                            {covered.slice(0, 3).map((act, i) => (
-                              <span key={i} className="bg-green-50 text-green-800 text-xs px-2 py-0.5 rounded border border-green-200">
-                                {act}
-                              </span>
-                            ))}
+                            {covered.slice(0, 3).map((act, i) => {
+                              const label = getActivityLabel(act)
+                              if (!label) return null
+                              return (
+                                <span key={i} className="bg-green-50 text-green-800 text-xs px-2 py-0.5 rounded border border-green-200">
+                                  {label}
+                                </span>
+                              )
+                            })}
                             {covered.length > 3 && (
                               <span className="text-xs text-gray-400 self-center">+{covered.length - 3} more</span>
                             )}
@@ -695,11 +763,15 @@ export default function ServiceManagement() {
                             <XCircle size={12} /> Excluded ({excluded.length})
                           </p>
                           <div className="flex flex-wrap gap-1.5">
-                            {excluded.slice(0, 3).map((act, i) => (
-                              <span key={i} className="bg-red-50 text-red-800 text-xs px-2 py-0.5 rounded border border-red-200">
-                                {act}
-                              </span>
-                            ))}
+                            {excluded.slice(0, 3).map((act, i) => {
+                              const label = getActivityLabel(act)
+                              if (!label) return null
+                              return (
+                                <span key={i} className="bg-red-50 text-red-800 text-xs px-2 py-0.5 rounded border border-red-200">
+                                  {label}
+                                </span>
+                              )
+                            })}
                             {excluded.length > 3 && (
                               <span className="text-xs text-gray-400 self-center">+{excluded.length - 3} more</span>
                             )}
