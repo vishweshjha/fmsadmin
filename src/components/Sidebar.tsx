@@ -17,7 +17,8 @@ import {
   Sparkles,
   ClipboardList,
   MapPin,
-  UtensilsCrossed
+  UtensilsCrossed,
+  ChefHat
 } from 'lucide-react'
 import { useAuth, UserRole } from '../context/AuthContext'
 
@@ -35,6 +36,7 @@ const menuItems: MenuItem[] = [
   { path: '/services', icon: Briefcase, label: 'Service Catalog', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },
   { path: '/serviceability', icon: MapPin, label: 'Serviceability Management', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },
   { path: '/cook-time-guide', icon: UtensilsCrossed, label: 'Cook Time Guide', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },
+  { path: '/cook-menu', icon: ChefHat, label: 'Cook Menu Items', requiredRoles: ['Super Admin', 'Operations Admin', 'Admin'] },
   { path: '/kyc', icon: FileCheck, label: 'KYC & Verification', requiredRoles: ['Super Admin', 'Compliance Officer'] },
   { path: '/bookings', icon: Calendar, label: 'Booking Management', requiredRoles: ['Super Admin', 'Operations Admin', 'Support Agent'] },
   { path: '/pricing', icon: DollarSign, label: 'Pricing & Commission', requiredRoles: ['Super Admin', 'Finance Admin'] },

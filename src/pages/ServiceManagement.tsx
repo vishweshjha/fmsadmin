@@ -9,8 +9,10 @@ import {
   Trash2,
   Edit3,
   Sparkles,
-  Clock
+  Clock,
+  UtensilsCrossed
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import apiClient from '../services/apiClient'
 import {
   fetchHelpCards,
@@ -55,6 +57,7 @@ interface ServiceItem {
 }
 
 export default function ServiceManagement() {
+  const navigate = useNavigate()
   const [categories, setCategories] = useState<ServiceCategory[]>([])
   const [serviceItems, setServiceItems] = useState<ServiceItem[]>([])
   const [helpCards, setHelpCards] = useState<AdminHelpCard[]>([])
@@ -418,6 +421,14 @@ export default function ServiceManagement() {
           >
             <Sparkles size={18} className="text-yellow-400" />
             Add Help Card
+          </button>
+
+          <button
+            onClick={() => navigate('/cook-menu')}
+            className="flex items-center gap-2 bg-purple-700 text-white px-3.5 py-2 rounded-lg hover:bg-purple-800 transition-colors text-sm font-medium shadow-sm"
+          >
+            <UtensilsCrossed size={18} />
+            Cook Menu Items
           </button>
         </div>
       </div>
