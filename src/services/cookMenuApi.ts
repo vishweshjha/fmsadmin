@@ -1,5 +1,16 @@
 import apiClient from './apiClient'
 
+export interface CookMenuItemIngredient {
+  id?: string
+  cookMenuItemId?: string
+  name: string
+  quantity: string
+  imageUrl?: string | null
+  orderIndex?: number
+  createdAt?: string
+  updatedAt?: string
+}
+
 export interface CookMenuItem {
   id: string
   name: string
@@ -16,6 +27,10 @@ export interface CookMenuItem {
     id: string
     name: string
   } | null
+  cuisineType?: string | null
+  prepTimeText?: string | null
+  servingsText?: string | null
+  ingredients?: CookMenuItemIngredient[]
   createdAt?: string
   updatedAt?: string
 }
@@ -106,3 +121,24 @@ export const toggleCookMenuItemStatus = async (id: string): Promise<CookMenuItem
 export const deleteCookMenuItem = async (id: string): Promise<void> => {
   await apiClient.delete(`/cook-menu/${id}`)
 }
+
+export const addCookMenuItemIngredient = async (
+  cookMenuItemId: string,
+  ingredient: Partial<CookMenuItemIngredient>
+): Promise<CookMenuItemIngredient> => {
+  const res = await apiClient.post<any>(`/cook-menu/${cookMenuItemId}/ingredients`, ingredient)
+  return res.data || res
+}
+
+export const updateCookMenuItemIngredient = async (
+  ingredientId: string,
+  ingredient: Partial<CookMenuItemIngredient>
+): Promise<CookMenuItemIngredient> => {
+  const res = await apiClient.put<any>(`/cook-menu/ingredients/${ingredientId}`, ingredient)
+  return res.data || res
+}
+
+export const deleteCookMenuItemIngredient = async (ingredientId: string): Promise<void> => {
+  await apiClient.delete(`/cook-menu/ingredients/${ingredientId}`)
+}
+

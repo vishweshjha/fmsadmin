@@ -14,7 +14,12 @@ import {
   Leaf,
   Flame,
   Layers,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Clock,
+  Users,
+  ChefHat,
+  PlusCircle,
+  X
 } from 'lucide-react'
 import {
   fetchCookMenuItemsAdmin,
@@ -28,6 +33,16 @@ import {
 } from '../services/cookMenuApi'
 
 const PRESET_CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Beverages']
+const PRESET_CUISINES = [
+  'Continental',
+  'South Indian',
+  'North Indian',
+  'Chinese',
+  'Italian',
+  'Mughlai',
+  'Street Food',
+  'Healthy / Diet'
+]
 const PRESET_BADGES = [
   'Popular Choice',
   'High Protein',
@@ -64,6 +79,10 @@ export default function CookMenuItemManagement() {
     orderIndex: 0,
     isActive: true,
     serviceItemId: '',
+    cuisineType: 'Continental',
+    prepTimeText: '15 mins',
+    servingsText: '2 Servings',
+    ingredients: [] as { id?: string; name: string; quantity: string; imageUrl?: string }[],
   })
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -116,6 +135,13 @@ export default function CookMenuItemManagement() {
       orderIndex: items.length + 1,
       isActive: true,
       serviceItemId: defaultCookService ? defaultCookService.id : (serviceItems[0]?.id || ''),
+      cuisineType: 'Continental',
+      prepTimeText: '15 mins',
+      servingsText: '2 Servings',
+      ingredients: [
+        { name: '', quantity: '', imageUrl: '' },
+        { name: '', quantity: '', imageUrl: '' }
+      ],
     })
     setFormError(null)
     setIsModalOpen(true)
@@ -134,9 +160,42 @@ export default function CookMenuItemManagement() {
       orderIndex: item.orderIndex,
       isActive: item.isActive,
       serviceItemId: item.serviceItemId || (serviceItems[0]?.id || ''),
+      cuisineType: item.cuisineType || 'Continental',
+      prepTimeText: item.prepTimeText || '15 mins',
+      servingsText: item.servingsText || '2 Servings',
+      ingredients: item.ingredients && item.ingredients.length > 0
+        ? item.ingredients.map((ing) => ({
+            id: ing.id,
+            name: ing.name,
+            quantity: ing.quantity,
+            imageUrl: ing.imageUrl || '',
+          }))
+        : [{ name: '', quantity: '', imageUrl: '' }],
     })
     setFormError(null)
     setIsModalOpen(true)
+  }
+
+  const handleAddIngredient = () => {
+    setFormData((prev) => ({
+      ...prev,
+      ingredients: [...prev.ingredients, { name: '', quantity: '', imageUrl: '' }],
+    }))
+  }
+
+  const handleRemoveIngredient = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      ingredients: prev.ingredients.filter((_, idx) => idx !== index),
+    }))
+  }
+
+  const handleIngredientChange = (index: number, field: string, value: string) => {
+    setFormData((prev) => {
+      const updated = [...prev.ingredients]
+      updated[index] = { ...updated[index], [field]: value }
+      return { ...prev, ingredients: updated }
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -162,6 +221,16 @@ export default function CookMenuItemManagement() {
       setSaving(true)
       setFormError(null)
 
+      const validIngredients = formData.ingredients
+        .filter((ing) => ing.name && ing.name.trim().length > 0)
+        .map((ing, idx) => ({
+          ...(ing.id ? { id: ing.id } : {}),
+          name: ing.name.trim(),
+          quantity: ing.quantity.trim() || '1 serving',
+          imageUrl: ing.imageUrl?.trim() || null,
+          orderIndex: idx,
+        }))
+
       const payload = {
         name: formData.name.trim(),
         category: formData.category.trim(),
@@ -173,6 +242,10 @@ export default function CookMenuItemManagement() {
         orderIndex: Number(formData.orderIndex) || 0,
         isActive: formData.isActive,
         serviceItemId: formData.serviceItemId,
+        cuisineType: formData.cuisineType.trim() ? formData.cuisineType.trim() : null,
+        prepTimeText: formData.prepTimeText.trim() ? formData.prepTimeText.trim() : null,
+        servingsText: formData.servingsText.trim() ? formData.servingsText.trim() : '2 Servings',
+        ingredients: validIngredients,
       }
 
       if (editingItem) {
@@ -485,11 +558,24 @@ export default function CookMenuItemManagement() {
                       </div>
                     </td>
 
-                    {/* Name & Description */}
+                    {/* Name & Description & Ingredients */}
                     <td className="py-3.5 px-4">
                       <div className="font-semibold text-gray-900">{item.name}</div>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[11px] text-gray-500">
+                        {item.cuisineType && <span className="font-medium text-gray-700">{item.cuisineType}</span>}
+                        {item.prepTimeText && <span>• {item.prepTimeText}</span>}
+                        {item.servingsText && <span>• {item.servingsText}</span>}
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium ${
+                          item.ingredients && item.ingredients.length > 0
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        }`}>
+                          <Layers className="w-3 h-3" />
+                          {item.ingredients?.length || 0} ingredients
+                        </span>
+                      </div>
                       {item.description && (
-                        <div className="text-xs text-gray-400 line-clamp-1 max-w-xs mt-0.5">
+                        <div className="text-xs text-gray-400 line-clamp-1 max-w-xs mt-1">
                           {item.description}
                         </div>
                       )}
@@ -612,8 +698,8 @@ export default function CookMenuItemManagement() {
       {/* Add / Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl max-w-xl w-full p-6 border border-gray-100 my-8">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full p-6 border border-gray-100 my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4 sticky top-0 bg-white z-10">
               <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                 <UtensilsCrossed className="w-5 h-5 text-purple-700" />
                 {editingItem ? 'Edit Cook Menu Item' : 'Add New Cook Menu Item'}
@@ -667,7 +753,7 @@ export default function CookMenuItemManagement() {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Paneer Butter Masala"
+                    placeholder="e.g. Peanut Butter Sandwich"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-600"
@@ -689,6 +775,57 @@ export default function CookMenuItemManagement() {
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              {/* Cuisine Type, Prep Time & Servings (Subtitle Details) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-3 bg-purple-50/50 rounded-lg border border-purple-100">
+                <div>
+                  <label className="block text-xs font-semibold text-purple-900 mb-1 flex items-center gap-1">
+                    <ChefHat className="w-3.5 h-3.5 text-purple-700" />
+                    Cuisine Type
+                  </label>
+                  <input
+                    type="text"
+                    list="cuisine-options"
+                    placeholder="e.g. Continental, South Indian"
+                    value={formData.cuisineType}
+                    onChange={(e) => setFormData({ ...formData, cuisineType: e.target.value })}
+                    className="w-full px-3 py-2 border border-purple-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-600"
+                  />
+                  <datalist id="cuisine-options">
+                    {PRESET_CUISINES.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-purple-900 mb-1 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-purple-700" />
+                    Prep Time Text
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 10 mins, 20 mins"
+                    value={formData.prepTimeText}
+                    onChange={(e) => setFormData({ ...formData, prepTimeText: e.target.value })}
+                    className="w-full px-3 py-2 border border-purple-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-purple-900 mb-1 flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5 text-purple-700" />
+                    Servings Text
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 2 Servings"
+                    value={formData.servingsText}
+                    onChange={(e) => setFormData({ ...formData, servingsText: e.target.value })}
+                    className="w-full px-3 py-2 border border-purple-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-600"
+                  />
                 </div>
               </div>
 
@@ -808,7 +945,7 @@ export default function CookMenuItemManagement() {
               {/* Description */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Description / Ingredients (Optional)
+                  Description / Summary (Optional)
                 </label>
                 <textarea
                   rows={2}
@@ -817,6 +954,115 @@ export default function CookMenuItemManagement() {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-600"
                 />
+              </div>
+
+              {/* Dynamic Ingredients List (Referential Integrity to CookMenuItem) */}
+              <div className="p-4 bg-purple-50/40 rounded-xl border border-purple-100">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                      <Layers className="w-4 h-4 text-purple-700" />
+                      Dish Ingredients (Dynamic Customer Popup)
+                    </h3>
+                    <p className="text-[11px] text-gray-500">
+                      Tied to this dish via DB referential integrity. Displayed in customer app bottom sheet popup.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddIngredient}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-700 hover:bg-purple-800 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors self-start sm:self-auto"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5" />
+                    Add Ingredient
+                  </button>
+                </div>
+
+                {formData.ingredients.length === 0 ? (
+                  <div className="text-center py-5 bg-white rounded-lg border border-dashed border-gray-200">
+                    <Layers className="w-7 h-7 text-gray-300 mx-auto mb-1" />
+                    <p className="text-xs text-gray-500 font-medium">No ingredients configured yet for this dish.</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">Click below to add the ingredients and quantities.</p>
+                    <button
+                      type="button"
+                      onClick={handleAddIngredient}
+                      className="mt-2 text-xs text-purple-700 font-semibold hover:underline inline-flex items-center gap-1"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" /> Add First Ingredient
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    {formData.ingredients.map((ing, idx) => (
+                      <div
+                        key={idx}
+                        className="flex flex-col sm:flex-row sm:items-center gap-2 bg-white p-2.5 rounded-lg border border-gray-200 shadow-xs"
+                      >
+                        <span className="text-xs font-mono font-semibold text-purple-700 w-6 text-center flex-shrink-0">
+                          #{idx + 1}
+                        </span>
+
+                        {/* Name */}
+                        <div className="flex-1 min-w-[120px]">
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ingredient name (e.g. Bread, Oil, Salt)"
+                            value={ing.name}
+                            onChange={(e) => handleIngredientChange(idx, 'name', e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-purple-600 font-medium"
+                          />
+                        </div>
+
+                        {/* Quantity */}
+                        <div className="w-full sm:w-32">
+                          <input
+                            type="text"
+                            placeholder="Quantity (e.g. 4 slices, 80g)"
+                            value={ing.quantity}
+                            onChange={(e) => handleIngredientChange(idx, 'quantity', e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-purple-600"
+                          />
+                        </div>
+
+                        {/* Image URL */}
+                        <div className="flex-1 min-w-[140px]">
+                          <input
+                            type="url"
+                            placeholder="Icon / Image URL (optional)"
+                            value={ing.imageUrl || ''}
+                            onChange={(e) => handleIngredientChange(idx, 'imageUrl', e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-purple-600 text-gray-600"
+                          />
+                        </div>
+
+                        {/* Thumbnail */}
+                        {ing.imageUrl && (
+                          <div className="w-7 h-7 rounded border border-gray-200 overflow-hidden bg-gray-50 flex-shrink-0">
+                            <img
+                              src={ing.imageUrl}
+                              alt={ing.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                ;(e.target as HTMLElement).style.display = 'none'
+                              }}
+                            />
+                          </div>
+                        )}
+
+                        {/* Remove */}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveIngredient(idx)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors self-end sm:self-center"
+                          title="Remove Ingredient"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Price & Order Index & Active */}
