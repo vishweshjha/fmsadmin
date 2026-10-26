@@ -44,6 +44,7 @@ interface ServiceableLocation {
   state: string
   pincode: string
   isActive: boolean
+  radiusMeters?: number
   isCookEnabled?: boolean
   categories?: string[]
   createdAt?: string
@@ -284,6 +285,7 @@ export default function ServiceabilityManagement() {
   const [city, setCity] = useState('')
   const [stateName, setStateName] = useState('')
   const [pincode, setPincode] = useState('')
+  const [radiusMeters, setRadiusMeters] = useState<number>(500)
   const [isActive, setIsActive] = useState(true)
   const [isCookEnabled, setIsCookEnabled] = useState(true)
 
@@ -655,6 +657,7 @@ export default function ServiceabilityManagement() {
     setCity('New Delhi')
     setStateName('Delhi')
     setPincode('110001')
+    setRadiusMeters(500)
     setIsActive(true)
     setIsCookEnabled(true)
     setSearchQuery('')
@@ -675,6 +678,7 @@ export default function ServiceabilityManagement() {
     setStateName(loc.state)
     setPincode(loc.pincode)
     setIsActive(loc.isActive)
+    setRadiusMeters(loc.radiusMeters || (loc.locationType === 'APARTMENT' ? 500 : 3000))
     setIsCookEnabled(loc.isCookEnabled !== false)
     setSearchQuery(loc.address)
     setSuggestions([])
@@ -707,6 +711,7 @@ export default function ServiceabilityManagement() {
       city: city.trim() || 'New Delhi',
       state: stateName.trim() || 'Delhi',
       pincode: pincode.trim() || '110001',
+      radiusMeters: Number(radiusMeters) || (locationType === 'APARTMENT' ? 500 : 3000),
       isActive,
       isCookEnabled,
       categories: isCookEnabled ? ['Gyors Help', 'Gyors Cook'] : ['Gyors Help'],
@@ -904,6 +909,9 @@ export default function ServiceabilityManagement() {
                         loc.locationType === 'APARTMENT' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                       }`}>
                         {loc.locationType === 'APARTMENT' ? 'Apartment/Society' : 'Area/Locality'}
+                      </span>
+                      <span className="text-[11px] text-gray-500 font-mono mt-0.5 block">
+                        {(loc.radiusMeters || (loc.locationType === 'APARTMENT' ? 500 : 3000))}m radius
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -1151,6 +1159,50 @@ export default function ServiceabilityManagement() {
                     onChange={(e) => setPincode(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 font-medium focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                    Geofence Radius (Meters) <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      placeholder="e.g. 500"
+                      value={radiusMeters}
+                      onChange={(e) => setRadiusMeters(Number(e.target.value))}
+                      required
+                      min={50}
+                      max={20000}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 font-medium focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setRadiusMeters(300)}
+                      className="px-2.5 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium"
+                    >
+                      300m
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRadiusMeters(500)}
+                      className="px-2.5 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium"
+                    >
+                      500m
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRadiusMeters(1000)}
+                      className="px-2.5 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium"
+                    >
+                      1km
+                    </button>
+                  </div>
+                  <span className="text-[11px] text-gray-500 mt-1 block">
+                    {locationType === 'APARTMENT'
+                      ? 'Recommended: 300m-500m to restrict service strictly to this society campus.'
+                      : 'Recommended: 1000m-3000m for broader areas.'}
+                  </span>
                 </div>
               </div>
 
