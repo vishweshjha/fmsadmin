@@ -30,6 +30,12 @@ export default function BookingManagement() {
   const [newReasonText, setNewReasonText] = useState('')
   const [addingReason, setAddingReason] = useState(false)
 
+  // Cancel Booking Action Modal State
+  const [cancelTargetBooking, setCancelTargetBooking] = useState<AdminBooking | null>(null)
+  const [selectedCancelReason, setSelectedCancelReason] = useState<string>('')
+  const [customCancelReason, setCustomCancelReason] = useState<string>('')
+  const [cancelling, setCancelling] = useState(false)
+
   const loadCancellationReasons = async () => {
     setReasonsLoading(true)
     try {
@@ -102,6 +108,7 @@ export default function BookingManagement() {
   useEffect(() => {
     loadBookings()
     loadProviders()
+    loadCancellationReasons()
   }, [])
 
   const handleAssignProvider = async (bookingId: string, providerId: string) => {
@@ -122,7 +129,7 @@ export default function BookingManagement() {
     setActionLoading(id)
     try {
       await updateBookingStatus(id, status, reason)
-      setBookings(prev => prev.map(b => b.id === id ? { ...b, status } : b))
+      setBookings(prev => prev.map(b => b.id === id ? { ...b, status, ...(reason ? { cancellationReason: reason } : {}) } : b))
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to update booking')
     } finally {
@@ -130,15 +137,35 @@ export default function BookingManagement() {
     }
   }
 
-  const handleCancelClick = (id: string, currentStatus: string) => {
-    if (currentStatus?.toLowerCase().includes('cancel')) return
-    const reason = window.prompt('Please enter the reason for cancellation:\n\nNote: If the customer already paid, a refund will automatically be triggered to their source.')
-    if (reason === null) return // user dismissed the prompt
-    if (reason.trim() === '') {
-      alert('A cancellation reason is strictly required to cancel and log this action.')
+  const openCancelModal = (booking: AdminBooking) => {
+    if (booking.status?.toLowerCase().includes('cancel')) return
+    setCancelTargetBooking(booking)
+    const activeReasons = cancellationReasons.filter(r => r.isActive)
+    setSelectedCancelReason(activeReasons.length > 0 ? activeReasons[0].reason : 'CUSTOM')
+    setCustomCancelReason('')
+  }
+
+  const handleConfirmCancel = async () => {
+    if (!cancelTargetBooking) return
+    const finalReason = selectedCancelReason === 'CUSTOM'
+      ? customCancelReason.trim()
+      : (selectedCancelReason || customCancelReason.trim())
+
+    if (!finalReason) {
+      alert('A cancellation reason is required to cancel this booking.')
       return
     }
-    handleStatusUpdate(id, 'CANCELLED', reason.trim())
+
+    setCancelling(true)
+    try {
+      await updateBookingStatus(cancelTargetBooking.id, 'CANCELLED', finalReason)
+      setBookings(prev => prev.map(b => b.id === cancelTargetBooking.id ? { ...b, status: 'CANCELLED', cancellationReason: finalReason } : b))
+      setCancelTargetBooking(null)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to cancel booking')
+    } finally {
+      setCancelling(false)
+    }
   }
 
   const getStatusBadge = (status: string) => {
@@ -314,8 +341,8 @@ export default function BookingManagement() {
                       ) : (
                         <div className="flex items-center gap-2">
                           {!booking.status?.toLowerCase().includes('cancel') && (
-                            <button onClick={() => handleCancelClick(booking.id, booking.status)}
-                              title="Cancel booking" className="text-red-600 hover:text-red-900">
+                            <button onClick={() => openCancelModal(booking)}
+                              title="Cancel booking" className="text-red-600 hover:text-red-900 transition p-1 hover:bg-red-50 rounded">
                               <XCircle size={18} />
                             </button>
                           )}
@@ -422,6 +449,83 @@ export default function BookingManagement() {
                 className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-300"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Booking Confirmation Modal */}
+      {cancelTargetBooking && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col">
+            <div className="px-6 py-4 bg-red-600 text-white flex items-center justify-between">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <XCircle size={20} /> Cancel Booking
+              </h3>
+              <button
+                onClick={() => setCancelTargetBooking(null)}
+                className="text-white hover:text-red-200 transition"
+                disabled={cancelling}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
+                Are you sure you want to cancel booking <strong>#{cancelTargetBooking.id.slice(0, 8)}</strong>?
+                {cancelTargetBooking.paymentStatus === 'PAID' && (
+                  <p className="mt-1 font-semibold text-xs text-red-900">
+                    ⚠️ A full refund will automatically be processed for this customer.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                  Cancellation Reason
+                </label>
+                <select
+                  value={selectedCancelReason}
+                  onChange={(e) => setSelectedCancelReason(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500 mb-2"
+                >
+                  {cancellationReasons.filter(r => r.isActive).map(r => (
+                    <option key={r.id} value={r.reason}>{r.reason}</option>
+                  ))}
+                  <option value="CUSTOM">Other / Custom Reason...</option>
+                </select>
+
+                {(selectedCancelReason === 'CUSTOM' || cancellationReasons.filter(r => r.isActive).length === 0) && (
+                  <textarea
+                    rows={3}
+                    placeholder="Enter custom cancellation reason..."
+                    value={customCancelReason}
+                    onChange={(e) => setCustomCancelReason(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 py-3 bg-gray-50 border-t flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setCancelTargetBooking(null)}
+                disabled={cancelling}
+                className="px-4 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition"
+              >
+                Keep Booking
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCancel}
+                disabled={cancelling}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition flex items-center gap-1.5"
+              >
+                {cancelling ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
+                Confirm Cancel
               </button>
             </div>
           </div>
