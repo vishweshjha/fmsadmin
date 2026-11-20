@@ -498,8 +498,13 @@ export default function BannerManagement() {
                             const reader = new FileReader();
                             reader.readAsDataURL(file);
                             reader.onload = (event) => {
+                              const dataUrl = event.target?.result as string;
+                              if (file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif') || file.type === 'image/webp') {
+                                setFormData(prev => ({ ...prev, imageUrl: dataUrl }));
+                                return;
+                              }
                               const img = new Image();
-                              img.src = event.target?.result as string;
+                              img.src = dataUrl;
                               img.onload = () => {
                                 const canvas = document.createElement('canvas');
                                 const MAX_WIDTH = 800;

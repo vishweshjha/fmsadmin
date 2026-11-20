@@ -1165,8 +1165,13 @@ export default function ServiceManagement() {
                             const reader = new FileReader();
                             reader.readAsDataURL(file);
                             reader.onload = (event) => {
+                              const dataUrl = event.target?.result as string;
+                              if (file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif') || file.type === 'image/webp') {
+                                setNewItem({ ...newItem, imageUrl: dataUrl });
+                                return;
+                              }
                               const img = new Image();
-                              img.src = event.target?.result as string;
+                              img.src = dataUrl;
                               img.onload = () => {
                                 const canvas = document.createElement('canvas');
                                 const MAX_WIDTH = 800;
@@ -1377,6 +1382,10 @@ export default function ServiceManagement() {
                                 ctx?.drawImage(img, 0, 0, width, height);
 
                                 // Compress to JPEG data URL (Saved to imageUrl like Banner table)
+                                if (file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif') || file.type === 'image/webp') {
+                                  setHelpCardForm({ ...helpCardForm, imageUrl: event.target?.result as string });
+                                  return;
+                                }
                                 const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
                                 setHelpCardForm({ ...helpCardForm, imageUrl: compressedDataUrl });
                               };
