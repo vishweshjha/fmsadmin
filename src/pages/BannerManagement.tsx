@@ -20,10 +20,11 @@ export default function BannerManagement() {
   const [services, setServices] = useState<ServiceItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
+
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'PAUSED' | 'EXPIRED'>('ALL')
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL')
 
   // Modal / Form State
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -32,6 +33,7 @@ export default function BannerManagement() {
     title: '',
     subtitle: '',
     imageUrl: '',
+    serviceCategoryId: '',
     redirectType: 'NONE' as 'NONE' | 'CATEGORY' | 'SERVICE',
     redirectId: '',
     startDate: '',
@@ -65,7 +67,7 @@ export default function BannerManagement() {
       if (catRes.success && catRes.data) {
         setCategories(catRes.data)
       }
-      
+
       const serviceRes = await apiClient.get<ServiceItem[]>('/services/items')
       if (serviceRes.success && serviceRes.data) {
         setServices(serviceRes.data)
@@ -82,11 +84,13 @@ export default function BannerManagement() {
     const now = new Date()
     const defaultEnd = new Date()
     defaultEnd.setMonth(now.getMonth() + 1) // default 1 month validity
-    
+
+    const defaultCat = categories.find(c => c.name.toLowerCase().includes('help')) || categories[0]
     setFormData({
       title: '',
       subtitle: '',
       imageUrl: defaultImages[0].url,
+      serviceCategoryId: defaultCat?.id || '',
       redirectType: 'NONE',
       redirectId: '',
       startDate: now.toISOString().slice(0, 16),
@@ -103,6 +107,7 @@ export default function BannerManagement() {
       title: banner.title,
       subtitle: banner.subtitle || '',
       imageUrl: banner.imageUrl,
+      serviceCategoryId: banner.serviceCategoryId || '',
       redirectType: banner.redirectType,
       redirectId: banner.redirectId || '',
       startDate: new Date(banner.startDate).toISOString().slice(0, 16),
@@ -152,6 +157,7 @@ export default function BannerManagement() {
         title: formData.title,
         subtitle: formData.subtitle || undefined,
         imageUrl: formData.imageUrl,
+        serviceCategoryId: formData.serviceCategoryId || null,
         redirectType: formData.redirectType,
         redirectId: formData.redirectType !== 'NONE' ? formData.redirectId : undefined,
         startDate: new Date(formData.startDate).toISOString(),
@@ -176,9 +182,16 @@ export default function BannerManagement() {
 
   // Filter banners locally
   const filteredBanners = banners.filter(banner => {
-    const matchesSearch = 
+    const matchesSearch =
       banner.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (banner.subtitle && banner.subtitle.toLowerCase().includes(searchTerm.toLowerCase()))
+
+    const matchesCategory =
+      categoryFilter === 'ALL' ||
+      !banner.serviceCategoryId ||
+      banner.serviceCategoryId === categoryFilter
+
+    if (!matchesCategory) return false
 
     const now = new Date()
     const isExpired = new Date(banner.endDate) < now
@@ -290,13 +303,39 @@ export default function BannerManagement() {
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition whitespace-nowrap ${
-                statusFilter === status
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-              }`}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition whitespace-nowrap ${statusFilter === status
+                ? 'bg-gray-900 text-white'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
             >
               {status === 'ALL' ? 'All Banners' : status === 'ACTIVE' ? 'Active' : status === 'PAUSED' ? 'Paused' : 'Expired'}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
+          <button
+            onClick={() => setCategoryFilter('ALL')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap border ${
+              categoryFilter === 'ALL'
+                ? 'bg-purple-700 text-white border-purple-700'
+                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            All Categories
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setCategoryFilter(cat.id)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap border ${
+                categoryFilter === cat.id
+                  ? cat.name.toLowerCase().includes('cook')
+                    ? 'bg-pink-600 text-white border-pink-600'
+                    : 'bg-purple-700 text-white border-purple-700'
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              {cat.name}
             </button>
           ))}
         </div>
@@ -327,7 +366,7 @@ export default function BannerManagement() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredBanners.map((banner) => {
             const isExpired = new Date(banner.endDate) < new Date()
-            
+
             return (
               <div key={banner.id} className="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col">
                 {/* Banner Preview Image */}
@@ -340,6 +379,28 @@ export default function BannerManagement() {
                       (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=400'
                     }}
                   />
+                  <div className="absolute top-4 left-4">
+                    {(() => {
+                      const matchedCat =
+                        banner.serviceCategory ||
+                        categories.find((c) => c.id === banner.serviceCategoryId);
+                      const catName = matchedCat?.name || 'All Categories';
+                      const isCookCat = catName.toLowerCase().includes('cook');
+                      return (
+                        <span
+                          className={`px-3 py-1 text-xs font-bold rounded-full shadow-sm ${
+                            !matchedCat
+                              ? 'bg-indigo-600 text-white'
+                              : isCookCat
+                              ? 'bg-pink-600 text-white'
+                              : 'bg-purple-700 text-white'
+                          }`}
+                        >
+                          {catName}
+                        </span>
+                      );
+                    })()}
+                  </div>
                   <div className="absolute top-4 right-4 flex gap-2">
                     {isExpired ? (
                       <span className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full">
@@ -387,13 +448,12 @@ export default function BannerManagement() {
                     <button
                       onClick={() => handleToggleStatus(banner)}
                       disabled={isExpired}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition ${
-                        isExpired
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : banner.isActive
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition ${isExpired
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : banner.isActive
                           ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
                           : 'bg-green-50 text-green-700 hover:bg-green-100'
-                      }`}
+                        }`}
                     >
                       {banner.isActive ? <Pause size={14} /> : <Play size={14} />}
                       {banner.isActive ? 'Pause' : 'Resume'}
@@ -467,6 +527,26 @@ export default function BannerManagement() {
                     className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
                   />
                 </div>
+              </div>
+
+              {/* Banner ServiceCategory Link (Foreign Key -> ServiceCategory.id) */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-700">Service Category Menu (Linked by Category ID)</label>
+                <select
+                  value={formData.serviceCategoryId}
+                  onChange={(e) => setFormData(prev => ({ ...prev, serviceCategoryId: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm font-medium bg-white"
+                >
+                  <option value="">All Category Menus (Global)</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-gray-500">
+                  Links this banner directly to the selected ServiceCategory ID so it displays in that category menu.
+                </p>
               </div>
 
               {/* Image Upload / URL Picker */}
@@ -547,7 +627,7 @@ export default function BannerManagement() {
                       onChange={(e) => setFormData(prev => ({ ...prev, imageUrl: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-xs"
                     />
-                    
+
                     {/* Suggestions quick selector */}
                     <div className="flex flex-wrap gap-2">
                       {defaultImages.map((img) => (
@@ -555,11 +635,10 @@ export default function BannerManagement() {
                           key={img.label}
                           type="button"
                           onClick={() => setFormData(prev => ({ ...prev, imageUrl: img.url }))}
-                          className={`px-2.5 py-1 text-xs rounded-lg border font-medium transition ${
-                            formData.imageUrl === img.url
-                              ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                              : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                          }`}
+                          className={`px-2.5 py-1 text-xs rounded-lg border font-medium transition ${formData.imageUrl === img.url
+                            ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                            : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                            }`}
                         >
                           {img.label}
                         </button>

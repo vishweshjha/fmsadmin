@@ -424,7 +424,7 @@ export async function fetchCategories(): Promise<{ id: string; name: string }[]>
   try {
     const res = await apiClient.get<any>(API_ENDPOINTS.COMMON.SERVICE_CATEGORIES)
     if (!res.success) return []
-    
+
     const data = res.data
     if (Array.isArray(data)) return data
     if (data?.categories && Array.isArray(data.categories)) return data.categories
@@ -440,7 +440,7 @@ export async function fetchServiceItems(): Promise<{ id: string; name: string; c
   try {
     const res = await apiClient.get<any>(API_ENDPOINTS.COMMON.SERVICE_ITEMS)
     if (!res.success) return []
-    
+
     const data = res.data
     if (Array.isArray(data)) return data
     if (data?.items && Array.isArray(data.items)) return data.items
@@ -655,21 +655,21 @@ function generateMockSalaryLedgers(dateFrom?: string, dateTo?: string): DailySal
   ]
 
   const records: DailySalaryLedger[] = []
-  
+
   // Calculate dates between from and to (or default to last 7 days)
   const end = dateTo ? new Date(dateTo) : new Date()
   const start = dateFrom ? new Date(dateFrom) : new Date(Date.now() - 7 * 86400000)
-  
+
   // Ensure dates are parsed correctly
   const curr = new Date(start)
   while (curr <= end) {
     const dateStr = curr.toISOString().split('T')[0]
-    
+
     providers.forEach((p, idx) => {
       // Create some variance based on date/index
       const daySeed = curr.getDate() + idx
       const worked = daySeed % 7 !== 0 // off-day once a week
-      
+
       if (worked) {
         let baseSalary = p.base
         let bonus = 0
@@ -677,7 +677,7 @@ function generateMockSalaryLedgers(dateFrom?: string, dateTo?: string): DailySal
         let penalty = 0
         let penaltyReason = ''
         let overtimeHours = 0
-        
+
         // Add random bonus or penalty for premium mock feel
         if (daySeed % 5 === 0) {
           bonus = 150
@@ -686,7 +686,7 @@ function generateMockSalaryLedgers(dateFrom?: string, dateTo?: string): DailySal
           bonus = 100
           bonusReason = 'Perfect Attendance Bonus'
         }
-        
+
         if (daySeed % 6 === 0) {
           penalty = 50
           penaltyReason = 'Late Check-in (>15 mins)'
@@ -694,7 +694,7 @@ function generateMockSalaryLedgers(dateFrom?: string, dateTo?: string): DailySal
           penalty = 120
           penaltyReason = 'Safety Protocol Warning'
         }
-        
+
         if (daySeed % 4 === 0) {
           overtimeHours = daySeed % 3 === 0 ? 2 : 1.5
         }
@@ -702,7 +702,7 @@ function generateMockSalaryLedgers(dateFrom?: string, dateTo?: string): DailySal
         const overtimeRate = p.ot
         const overtimePay = overtimeHours * overtimeRate
         const finalSalary = baseSalary + bonus + overtimePay - penalty
-        
+
         const statuses: DailySalaryLedger['status'][] = ['Paid', 'Approved', 'Pending Review', 'Disputed']
         const status = statuses[daySeed % statuses.length]
 
@@ -740,7 +740,7 @@ function generateMockSalaryLedgers(dateFrom?: string, dateTo?: string): DailySal
     })
     curr.setDate(curr.getDate() + 1)
   }
-  
+
   return records
 }
 
@@ -754,7 +754,7 @@ export async function fetchSalaryLedger(params?: {
   try {
     // Attempt backend call first (fallback to mock if endpoint doesn't exist)
     const res = await apiClient.get<any>('/admin/salary-ledger', params)
-    
+
     let ledgers: DailySalaryLedger[] = []
     if (res.success && Array.isArray(res.data)) {
       ledgers = res.data
@@ -765,7 +765,7 @@ export async function fetchSalaryLedger(params?: {
       }
       ledgers = memoryLedgerStore
     }
-    
+
     // Apply client-side filters
     return ledgers.filter(item => {
       if (params?.providerId && item.providerId !== params.providerId) return false
@@ -812,7 +812,7 @@ export async function updateSalaryLedger(
   if (!memoryLedgerStore) {
     memoryLedgerStore = generateMockSalaryLedgers()
   }
-  
+
   let updatedItem: DailySalaryLedger | null = null
   memoryLedgerStore = memoryLedgerStore.map(item => {
     if (item.id === id) {
@@ -983,7 +983,7 @@ export async function updatePayrollRule(id: string, updates: Partial<PayrollRule
   if (!memoryRulesStore) {
     memoryRulesStore = [...PRESET_PAYROLL_RULES]
   }
-  
+
   let updated: PayrollRule | null = null
   memoryRulesStore = memoryRulesStore.map(r => {
     if (r.id === id) {
@@ -1222,7 +1222,7 @@ export async function updatePayoutSettlementStatus(id: string, status: 'Approve'
       await approvePayrollSettlement(id)
       return { id, status } as any
     }
-    
+
     // Fallback/Mock for Hold/Reject local overrides
     const res = await apiClient.patch<PayoutSettlementItem>(`/admin/payroll-settlements/${id}/status`, { status })
     if (res.success && res.data) {
@@ -1261,7 +1261,7 @@ export async function createSettlementBatch(data: { dateFrom: string; dateTo: st
   }
   const selectedPayouts = memoryPayoutsStore.filter(item => data.providerIds.includes(item.providerId))
   const totalAmount = selectedPayouts.reduce((sum, item) => sum + item.amount, 0)
-  
+
   const newBatch: SettlementBatch = {
     id: `batch-${Date.now()}`,
     batchCode: `BATCH-${data.dateFrom.replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`,
@@ -1381,6 +1381,8 @@ export interface Banner {
   title: string
   subtitle?: string
   imageUrl: string
+  serviceCategoryId?: string | null
+  serviceCategory?: { id: string; name: string; icon?: string } | null
   redirectType: 'NONE' | 'CATEGORY' | 'SERVICE'
   redirectId?: string
   startDate: string
