@@ -315,11 +315,10 @@ export default function BannerManagement() {
         <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
           <button
             onClick={() => setCategoryFilter('ALL')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap border ${
-              categoryFilter === 'ALL'
-                ? 'bg-purple-700 text-white border-purple-700'
-                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-            }`}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap border ${categoryFilter === 'ALL'
+              ? 'bg-purple-700 text-white border-purple-700'
+              : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+              }`}
           >
             All Categories
           </button>
@@ -327,13 +326,12 @@ export default function BannerManagement() {
             <button
               key={cat.id}
               onClick={() => setCategoryFilter(cat.id)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap border ${
-                categoryFilter === cat.id
-                  ? cat.name.toLowerCase().includes('cook')
-                    ? 'bg-pink-600 text-white border-pink-600'
-                    : 'bg-purple-700 text-white border-purple-700'
-                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-              }`}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap border ${categoryFilter === cat.id
+                ? cat.name.toLowerCase().includes('cook')
+                  ? 'bg-pink-600 text-white border-pink-600'
+                  : 'bg-purple-700 text-white border-purple-700'
+                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                }`}
             >
               {cat.name}
             </button>
@@ -388,13 +386,12 @@ export default function BannerManagement() {
                       const isCookCat = catName.toLowerCase().includes('cook');
                       return (
                         <span
-                          className={`px-3 py-1 text-xs font-bold rounded-full shadow-sm ${
-                            !matchedCat
-                              ? 'bg-indigo-600 text-white'
-                              : isCookCat
+                          className={`px-3 py-1 text-xs font-bold rounded-full shadow-sm ${!matchedCat
+                            ? 'bg-indigo-600 text-white'
+                            : isCookCat
                               ? 'bg-pink-600 text-white'
                               : 'bg-purple-700 text-white'
-                          }`}
+                            }`}
                         >
                           {catName}
                         </span>

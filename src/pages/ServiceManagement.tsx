@@ -59,7 +59,7 @@ interface ServiceItem {
 const getFullImageUrl = (url?: string) => {
   if (!url) return ''
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url
-  const backendOrigin = 'https://gyors-backend-311476989793.us-central1.run.app'
+  const backendOrigin = 'https://backend-311476989793.asia-south1.run.app'
   return `${backendOrigin}${url.startsWith('/') ? '' : '/'}${url}`
 }
 

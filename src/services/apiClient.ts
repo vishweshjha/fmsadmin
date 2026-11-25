@@ -8,7 +8,7 @@ class ApiClient {
   private token: string | null = null
 
   constructor() {
-    this.baseURL = import.meta.env.VITE_API_URL || 'https://gyors-backend-311476989793.us-central1.run.app/api'
+    this.baseURL = import.meta.env.VITE_API_URL || 'https://backend-311476989793.asia-south1.run.app/api'
     this.loadToken()
   }
 

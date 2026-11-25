@@ -1,10 +1,10 @@
 /**
  * API Endpoints Definition
- * Base URL: https://gyors-backend-311476989793.us-central1.run.app/api
+ * Base URL: https://backend-311476989793.asia-south1.run.app/api
  */
 
 // const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
-const BASE_URL = import.meta.env.VITE_API_URL || 'https://gyors-backend-311476989793.us-central1.run.app/api'
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://backend-311476989793.asia-south1.run.app/api'
 
 export const API_ENDPOINTS = {
   // Authentication

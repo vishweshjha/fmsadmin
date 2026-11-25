@@ -23,7 +23,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 // Admin auth always goes to the admin backend
-export const LOCAL_ADMIN_API = import.meta.env.VITE_API_URL || 'https://gyors-backend-311476989793.us-central1.run.app/api'
+export const LOCAL_ADMIN_API = import.meta.env.VITE_API_URL || 'https://backend-311476989793.asia-south1.run.app/api'
 export const ADMIN_AUTH_LOGIN = `${LOCAL_ADMIN_API}/auth/admin/login`
 export const ADMIN_AUTH_SIGNUP = `${LOCAL_ADMIN_API}/auth/admin/signup`
 export const ADMIN_AUTH_FORGOT = `${LOCAL_ADMIN_API}/auth/admin/forgot-password`
